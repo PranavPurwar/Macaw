@@ -1,0 +1,47 @@
+package dev.pranav.filemanager
+
+import android.app.Application
+import android.os.Build
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+
+import coil3.gif.AnimatedImageDecoder
+import coil3.gif.GifDecoder
+import coil3.request.allowConversionToBitmap
+import coil3.request.crossfade
+import coil3.svg.SvgDecoder
+import coil3.video.VideoFrameDecoder
+import dev.pranav.filemanager.util.coil.ApkDecoder
+import dev.pranav.filemanager.util.coil.FileMapper
+
+class App: Application(), SingletonImageLoader.Factory {
+
+    companion object {
+        lateinit var app: App
+    }
+
+    override fun onCreate() {
+        app = this
+
+        super.onCreate()
+    }
+
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        return ImageLoader.Builder(context)
+            .crossfade(true)
+            .allowConversionToBitmap(true)
+            .components {
+                add(ApkDecoder.Factory(context))
+                add(FileMapper())
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    add(AnimatedImageDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+                add(SvgDecoder.Factory())
+                add(VideoFrameDecoder.Factory())
+            }
+            .build()
+    }
+}
