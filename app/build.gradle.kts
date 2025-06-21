@@ -44,7 +44,6 @@ android {
 dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    implementation(libs.cascade)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -54,23 +53,38 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.material3.adaptive.navigation.suite)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+    implementation(libs.androidx.activity)
+    implementation(libs.gson)
 
     implementation(libs.editor)
     implementation(libs.language.textmate)
     implementation(libs.dfc)
-    implementation(libs.zoomable)
-    implementation(libs.zoomable.coil3)
     implementation(libs.coil)
     implementation(libs.coil.svg)
     implementation(libs.coil.gif)
     implementation(libs.coil.video)
     implementation(libs.anggrayudi.storage)
     implementation(libs.java.diff.utils)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.activity)
     implementation(libs.compose.markdown)
+    implementation(libs.compose.preferences)
+
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui.compose)
+    implementation(libs.androidx.media3.session)
+
+    // Optional: For additional audio format support
+    implementation(libs.androidx.media3.decoder)
+    implementation(libs.androidx.media3.extractor)
+
+    // For better notification handling
+    implementation(libs.androidx.media3.common)
+
+    implementation(libs.saket.cascade)
+    implementation(libs.saket.squigglyslider)
+    implementation(libs.saket.zoomable)
+    implementation(libs.saket.zoomable.coil3)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

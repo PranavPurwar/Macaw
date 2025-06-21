@@ -1,13 +1,16 @@
 package dev.pranav.filemanager.util.coil
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
-import androidx.core.net.toUri
 import coil3.map.Mapper
 import coil3.request.Options
 import dev.pranav.filemanager.R
 import dev.pranav.filemanager.model.FileType
 import dev.pranav.filemanager.model.IMAGE_FORMATS
+import dev.pranav.filemanager.model.VIDEO_FORMATS
 import dev.pranav.filemanager.model.getFileType
 import java.io.File
 
@@ -17,8 +20,8 @@ class FileMapper : Mapper<File, Any> {
 
         if (data.isDirectory) return R.drawable.twotone_folder_24
 
-        if (data.extension in IMAGE_FORMATS || data.extension == "apk") {
-            return data.toUri()
+        if (data.extension in IMAGE_FORMATS || data.extension in VIDEO_FORMATS || data.extension == "apk") {
+            return data
         }
 
         when (data.extension) {
@@ -28,13 +31,29 @@ class FileMapper : Mapper<File, Any> {
         }
 
         return when (fileType) {
-            FileType.VIDEO -> R.drawable.outline_videocam_24
             FileType.ARCHIVE ->  Icons.Default.Archive
-            FileType.AUDIO -> R.drawable.rounded_music_note_24
-            FileType.TEXT -> R.mipmap.pdf
+            FileType.AUDIO -> extractAudioThumbnail(data.absolutePath) ?: R.drawable.rounded_music_note_24
+            FileType.TEXT -> R.drawable.file_type_text
             FileType.CODE -> R.drawable.file_type_code
             else -> R.mipmap.unk
         }
     }
+
+
+    private fun extractAudioThumbnail(filePath: String): Bitmap? {
+        return try {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(filePath)
+            val embeddedPicture = retriever.embeddedPicture
+            retriever.release()
+
+            embeddedPicture?.let {
+                BitmapFactory.decodeByteArray(it, 0, it.size)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
 }
 

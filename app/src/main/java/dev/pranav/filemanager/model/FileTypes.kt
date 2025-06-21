@@ -13,23 +13,24 @@ enum class FileType {
 }
 
 val IMAGE_FORMATS = listOf(
-    "png", "jpg", "jpeg", "svg", "webp"
+    "png", "jpg", "jpeg", "svg", "webp", "gif", "bmp", "avif", "ico", "tiff", "heic", "heif"
 )
 
+// Video formats supported by coil
 val VIDEO_FORMATS = listOf(
-    "mp4"
+    "mp4", "3gp", "mkv", "webm"
 )
 
 val AUDIO_FORMATS = listOf(
-    "mp3", "aac"
+    "mp3", "aac", "m4a"
 )
 
 val ARCHIVE_FORMATS = listOf(
     "zip", "tar", "gz", "aab"
 )
 
-val EDITOR_FORMATS = listOf(
-    "txt", "json", "md", "properties", "ini"
+val TEXT_FORMATS = listOf(
+    "txt", "json", "md", "properties", "ini", "csv"
 )
 
 val CODE_FORMATS = listOf(
@@ -37,7 +38,7 @@ val CODE_FORMATS = listOf(
 )
 
 fun File.getFileType(): FileType {
-    if (extension in EDITOR_FORMATS) return FileType.TEXT
+    if (extension in TEXT_FORMATS) return FileType.TEXT
     if (extension in IMAGE_FORMATS) return FileType.IMAGE
     if (extension in VIDEO_FORMATS) return FileType.VIDEO
     if (extension in AUDIO_FORMATS) return FileType.AUDIO
