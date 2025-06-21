@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.pranav.filemanager"
+    namespace = "dev.pranav.macaw"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.pranav.filemanager"
+        applicationId = "dev.pranav.macaw"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

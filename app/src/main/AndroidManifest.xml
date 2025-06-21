@@ -5,6 +5,9 @@
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="AllFilesAccessPolicy,ScopedStorage" />
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="PackageVisibilityPolicy,QueryAllPackagesPermission" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
         tools:ignore="ForegroundServicesPolicy" />
@@ -13,7 +16,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
-        android:name=".App"
+        android:name="dev.pranav.macaw.App"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -24,7 +27,7 @@
         android:theme="@style/Theme.FileManager">
 
         <activity
-            android:name=".MainActivity"
+            android:name="dev.pranav.macaw.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.FileManager">
             <intent-filter>
@@ -35,20 +38,20 @@
         </activity>
 
         <activity
-            android:name=".ui.settings.SettingsActivity"
+            android:name="dev.pranav.macaw.ui.settings.SettingsActivity"
             android:exported="true" />
         <activity
-            android:name=".ui.editor.TextEditorActivity"
+            android:name="dev.pranav.macaw.ui.editor.TextEditorActivity"
             android:exported="true" />
         <activity
-            android:name=".ui.preview.ImagePreviewActivity"
+            android:name="dev.pranav.macaw.ui.preview.ImagePreviewActivity"
             android:exported="true" />
         <activity
-            android:name=".ui.preview.VideoPreviewActivity"
+            android:name="dev.pranav.macaw.ui.preview.VideoPreviewActivity"
             android:exported="true" />
 
         <service
-            android:name=".ui.preview.PlaybackService"
+            android:name="dev.pranav.macaw.ui.preview.PlaybackService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true">
             <intent-filter>
@@ -63,6 +66,16 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths" />
+        </provider>
     </application>
 
 </manifest>

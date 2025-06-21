@@ -24,7 +24,6 @@ material3 = "1.4.0-alpha16"
 activity = "1.10.1"
 cascade = "2.3.0"
 composeUi = "1.9.0-beta01"
-wavySlider = "2.1.0-rc"
 media3Session = "1.7.1"
 
 [libraries]
@@ -53,7 +52,6 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version.ref = "composeUi" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "composeUi" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
-androidx-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "material3" }
 
 editor = { module = "io.github.Rosemoe.sora-editor:editor", version.ref = "editor" }
 language-textmate = { module = "io.github.Rosemoe.sora-editor:language-textmate", version.ref = "editor" }

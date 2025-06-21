@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FileManager"
+rootProject.name = "macaw"
 include(":app")
