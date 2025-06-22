@@ -9,33 +9,59 @@ enum class FileType {
     ARCHIVE,
     TEXT,
     CODE,
-    UNKNOWN
+    UNKNOWN,
 }
 
-val IMAGE_FORMATS = listOf(
-    "png", "jpg", "jpeg", "svg", "webp", "gif", "bmp", "avif", "ico", "tiff", "heic", "heif"
-)
+val IMAGE_FORMATS =
+    listOf("png", "jpg", "jpeg", "svg", "webp", "gif", "bmp", "avif", "ico", "tiff", "heic", "heif")
 
 // Video formats supported by coil
-val VIDEO_FORMATS = listOf(
-    "mp4", "3gp", "mkv", "webm"
-)
+val VIDEO_FORMATS = listOf("mp4", "3gp", "mkv", "webm")
 
-val AUDIO_FORMATS = listOf(
-    "mp3", "aac", "m4a"
-)
+val AUDIO_FORMATS = listOf("mp3", "aac", "m4a")
 
-val ARCHIVE_FORMATS = listOf(
-    "zip", "tar", "gz", "aab"
-)
+val ARCHIVE_FORMATS = listOf("zip", "tar", "gz", "aab")
 
-val TEXT_FORMATS = listOf(
-    "txt", "json", "md", "properties", "ini", "csv"
-)
+val TEXT_FORMATS = listOf("txt", "json", "md", "properties", "ini", "csv")
 
-val CODE_FORMATS = listOf(
-    "bash", "c", "cpp", "cs", "css", "dart", "go", "h", "hpp", "html", "java", "js", "json", "kts", "kt", "lua", "md", "php", "pl", "properties", "py", "r", "rb", "rs", "scala", "sh", "sql", "swift", "ts", "vb", "xml", "yaml", "yml"
-)
+val CODE_FORMATS =
+    listOf(
+        "bash",
+        "c",
+        "cpp",
+        "cs",
+        "css",
+        "dart",
+        "go",
+        "h",
+        "hpp",
+        "html",
+        "java",
+        "js",
+        "json",
+        "kts",
+        "kt",
+        "lua",
+        "md",
+        "php",
+        "pl",
+        "properties",
+        "py",
+        "r",
+        "rb",
+        "rs",
+        "scala",
+        "sh",
+        "sql",
+        "swift",
+        "ts",
+        "vb",
+        "xml",
+        "yaml",
+        "yml",
+        "s",
+        "asm",
+    )
 
 fun File.getFileType(): FileType {
     if (extension in TEXT_FORMATS) return FileType.TEXT
@@ -47,4 +73,3 @@ fun File.getFileType(): FileType {
 
     return FileType.UNKNOWN
 }
-
