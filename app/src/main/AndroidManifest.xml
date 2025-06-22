@@ -52,7 +52,7 @@
             android:name="dev.pranav.macaw.ui.preview.VideoPreviewActivity"
             android:exported="true" />
         <activity
-            android:name="dev.pranav.macaw.ui.preview.PdfPreviewActivity"
+            android:name="dev.pranav.macaw.ui.preview.PDFPreviewActivity"
             android:exported="true" />
 
         <service

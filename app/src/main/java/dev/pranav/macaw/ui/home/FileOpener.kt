@@ -4,13 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import com.rajat.pdfviewer.PdfViewerActivity
-import com.rajat.pdfviewer.util.saveTo
 import dev.pranav.macaw.model.AUDIO_FORMATS
 import dev.pranav.macaw.model.FileType
 import dev.pranav.macaw.model.getFileType
 import dev.pranav.macaw.ui.editor.TextEditorActivity
 import dev.pranav.macaw.ui.preview.ImagePreviewActivity
+import dev.pranav.macaw.ui.preview.PDFPreviewActivity
 import dev.pranav.macaw.ui.preview.VideoPreviewActivity
 import java.io.File
 
@@ -38,7 +37,7 @@ enum class FileAction {
 }
 
 fun determineFileAction(file: File): FileAction {
-    return when (file.extension) {
+    return when (file.extension.lowercase()) {
         in AUDIO_FORMATS -> FileAction.HANDLE_AUDIO
 
         "apk" -> FileAction.OPEN_APK_DETAILS
@@ -53,10 +52,10 @@ fun determineFileAction(file: File): FileAction {
 }
 
 fun handleFileClick(context: Context, file: File, onDialogFileSelected: (File) -> Unit = {}) {
-    when (determineFileAction(file)) {
+    val action = determineFileAction(file)
+    when (action) {
         FileAction.HANDLE_AUDIO, FileAction.OPEN_APK_DETAILS -> onDialogFileSelected(file)
-
-        else -> executeFileAction(context, file, determineFileAction(file))
+        else -> executeFileAction(context, file, action)
     }
 }
 
@@ -81,12 +80,9 @@ fun executeFileAction(context: Context, file: File, action: FileAction) {
         }
 
         FileAction.OPEN_PDF_PREVIEW -> {
-            PdfViewerActivity.launchPdfFromPath(
-                context = context,
-                path = file.absolutePath,
-                pdfTitle = file.nameWithoutExtension,
-                saveTo = saveTo.ASK_EVERYTIME,
-            )
+            val intent = Intent(context, PDFPreviewActivity::class.java)
+            intent.putExtra("file", file)
+            context.startActivity(intent)
         }
 
         FileAction.OPEN_WITH_SYSTEM -> openWithSystemApp(context, file)
