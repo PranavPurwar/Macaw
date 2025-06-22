@@ -1,6 +1,6 @@
 # Macaw - FileManager
 
-![Macaw](app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp)
+![Macaw](macaw.svg)
 
 > "The best way to predict the future is to invent it." - Alan Kay
 

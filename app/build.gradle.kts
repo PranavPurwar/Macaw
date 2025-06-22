@@ -86,6 +86,9 @@ dependencies {
     implementation(libs.saket.zoomable)
     implementation(libs.saket.zoomable.coil3)
 
+    implementation(libs.commons.compress)
+    implementation(libs.pdf.viewer)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -66,7 +66,7 @@ import java.util.Locale
 @Composable
 fun ApkBottomSheet(file: File, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var apkInfo by remember { mutableStateOf<ApkInfo?>(null) }
     var installStatus by remember { mutableStateOf<InstallStatus>(InstallStatus.NotInstalled) }
 
@@ -257,12 +257,33 @@ fun ApkBottomSheet(file: File, onDismiss: () -> Unit) {
                             .padding(vertical = 8.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            info.signatures.forEach { signature ->
-                                DetailItem("Issuer", signature.issuer)
-                                DetailItem("Subject", signature.subject)
-                                DetailItem("Serial", signature.serialNumber)
-                                DetailItem("SHA-256", signature.sha256)
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                            info.signatures.forEachIndexed { index, signature ->
+                                Column {
+                                    Text("Issuer", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        signature.issuer,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+
+                                    Text("Subject", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        signature.subject,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+
+                                    Text("Serial", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        signature.serialNumber,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+
+                                    Text("SHA-256", fontWeight = FontWeight.SemiBold)
+                                    Text(signature.sha256)
+                                }
+
+                                if (index < info.signatures.size - 1) {
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                }
                             }
 
                             if (info.signatures.isEmpty()) {
@@ -286,7 +307,15 @@ fun ApkBottomSheet(file: File, onDismiss: () -> Unit) {
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     bundle.keySet().sorted().forEach { key ->
-                                        DetailItem(key, bundle.getString(key) ?: "N/A")
+                                        val value = @Suppress("DEPRECATION") bundle.get(key)
+                                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                            Text(
+                                                text = key,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            )
+                                            Text(text = value?.toString() ?: "N/A")
+                                        }
                                     }
                                 }
                             }
@@ -391,9 +420,16 @@ private fun getApkInfo(context: Context, apkFile: File): ApkInfo? {
     val packageManager = context.packageManager
 
     @Suppress("DEPRECATION")
+    var flags =
+        PackageManager.GET_PERMISSIONS or PackageManager.GET_META_DATA or PackageManager.GET_SIGNATURES
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        flags = flags or PackageManager.GET_SIGNING_CERTIFICATES
+    }
+
+    @Suppress("DEPRECATION")
     val packageInfo = packageManager.getPackageArchiveInfo(
         apkFile.absolutePath,
-        PackageManager.GET_PERMISSIONS or PackageManager.GET_SIGNATURES or PackageManager.GET_META_DATA
+        flags
     )
 
     packageInfo?.applicationInfo?.sourceDir = apkFile.absolutePath
@@ -404,17 +440,13 @@ private fun getApkInfo(context: Context, apkFile: File): ApkInfo? {
             packageManager.getApplicationLabel(appInfo).toString()
         }
         val icon = it.applicationInfo?.loadIcon(packageManager)?.toBitmap()
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val signingInfo = it.signingInfo
-            signingInfo?.apkContentsSigners?.mapNotNull { sig ->
-                extractSignatureInfo(sig)
+        val signatures =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && it.signingInfo?.apkContentsSigners != null) {
+                it.signingInfo!!.apkContentsSigners.mapNotNull { sig -> extractSignatureInfo(sig) }
+            } else {
+                @Suppress("DEPRECATION")
+                it.signatures?.mapNotNull { sig -> extractSignatureInfo(sig) }
             }
-        } else {
-            @Suppress("DEPRECATION")
-            it.signatures?.mapNotNull { sig ->
-                extractSignatureInfo(sig)
-            }
-        }
 
         @Suppress("DEPRECATION")
         ApkInfo(

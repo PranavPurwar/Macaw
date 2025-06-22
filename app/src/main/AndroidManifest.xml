@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-sdk tools:overrideLibrary="androidx.pdf,androidx.pdf.document.service,androidx.pdf.compose" />
+
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="AllFilesAccessPolicy,ScopedStorage" />
@@ -48,6 +50,9 @@
             android:exported="true" />
         <activity
             android:name="dev.pranav.macaw.ui.preview.VideoPreviewActivity"
+            android:exported="true" />
+        <activity
+            android:name="dev.pranav.macaw.ui.preview.PdfPreviewActivity"
             android:exported="true" />
 
         <service

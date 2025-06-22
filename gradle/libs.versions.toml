@@ -1,5 +1,6 @@
 [versions]
 agp = "8.12.0-alpha06"
+commonsCompress = "1.27.1"
 composeMarkdown = "0.5.7"
 gson = "2.13.1"
 javaDiffUtils = "4.15"
@@ -16,6 +17,9 @@ editor = "0.23.5"
 dfc = "1.2"
 materialIconsExtended = "1.7.8"
 media3Exoplayer = "1.8.0-alpha01"
+nutrient = "10.4.0"
+pdfCompose = "1.0.0-alpha09"
+pdfViewer = "2.3.7"
 storage = "2.1.0"
 telephoto = "0.16.0"
 coil3 = "3.2.0"
@@ -35,7 +39,10 @@ androidx-media3-extractor = { module = "androidx.media3:media3-extractor", versi
 androidx-media3-ui-compose = { module = "androidx.media3:media3-ui-compose", version.ref = "media3Exoplayer" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
+androidx-pdf-compose = { module = "androidx.pdf:pdf-compose", version.ref = "pdfCompose" }
+androidx-pdf-document-service = { module = "androidx.pdf:pdf-document-service", version.ref = "pdfCompose" }
 anggrayudi-storage = { module = "com.anggrayudi:storage", version.ref = "storage" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
 compose-markdown = { module = "com.github.jeziellago:compose-markdown", version.ref = "composeMarkdown" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 java-diff-utils = { module = "io.github.java-diff-utils:java-diff-utils", version.ref = "javaDiffUtils" }
@@ -60,6 +67,8 @@ dfc = { module = "com.lazygeniouz:dfc", version.ref = "dfc" }
 
 compose-preferences = { module = "me.zhanghai.compose.preference:library", version.ref = "compose-preferences" }
 
+nutrient = { module = "io.nutrient:nutrient", version.ref = "nutrient" }
+pdf-viewer = { module = "io.github.afreakyelf:Pdf-Viewer", version.ref = "pdfViewer" }
 saket-squigglyslider = { group = "me.saket.squigglyslider", name = "squigglyslider", version = "1.0.0" }
 saket-cascade = { module = "me.saket.cascade:cascade-compose", version.ref = "cascade" }
 saket-zoomable-coil3 = { module = "me.saket.telephoto:zoomable-image-coil3", version.ref = "telephoto" }

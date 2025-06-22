@@ -31,6 +31,7 @@ import androidx.compose.material.icons.twotone.Edit
 import androidx.compose.material.icons.twotone.FileCopy
 import androidx.compose.material.icons.twotone.Info
 import androidx.compose.material.icons.twotone.Share
+import androidx.compose.material.icons.twotone.Unarchive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -66,6 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import coil3.compose.AsyncImage
 import dev.pranav.macaw.R
+import dev.pranav.macaw.model.FileType
+import dev.pranav.macaw.model.getFileType
 import dev.pranav.macaw.ui.editor.TextEditorActivity
 import dev.pranav.macaw.ui.preview.ApkBottomSheet
 import dev.pranav.macaw.ui.preview.AudioPreviewDialog
@@ -74,6 +77,7 @@ import dev.pranav.macaw.util.cloneFile
 import dev.pranav.macaw.util.compress
 import dev.pranav.macaw.util.deleteFile
 import dev.pranav.macaw.util.details
+import dev.pranav.macaw.util.extract
 import dev.pranav.macaw.util.getHash
 import dev.pranav.macaw.util.getLastModifiedDate
 import dev.pranav.macaw.util.orderedChildren
@@ -185,6 +189,11 @@ fun HomeScreen(
                     file.compress(destination)
                 }
 
+                FileAction.EXTRACT -> {
+                    val destDir = File(file.parentFile, file.nameWithoutExtension)
+                    file.extract(destDir)
+                }
+
                 FileAction.CUT -> {
                     Clipboard.cut(file)
                 }
@@ -246,17 +255,14 @@ fun HomeScreen(
             sheetState = sheetState,
         ) {
             FileActionBottomSheet(
+                file = longClickedFile!!,
                 onDismiss = { showBottomSheet = false },
                 onAction = {
                     coroutineScope.launch {
                         when (it) {
                             FileAction.RENAME -> showRenameDialog = true
                             FileAction.DETAILS -> {
-                                if (longClickedFile?.extension?.lowercase() == "apk") {
-                                    showApkBottomSheet = true
-                                } else {
-                                    showDetailsDialog = true
-                                }
+                                showDetailsDialog = true
                                 showBottomSheet = false
                             }
 
@@ -340,7 +346,25 @@ fun HomeScreen(
                                     }
                                 } else {
                                     handleFileClick(context, clickedFile) { dialogFile ->
-                                        filePreviewState = FilePreviewState.Audio(dialogFile)
+                                        when (determineFileAction(dialogFile)) {
+                                            FileAction.HANDLE_AUDIO -> {
+                                                filePreviewState =
+                                                    FilePreviewState.Audio(dialogFile)
+                                            }
+
+                                            FileAction.OPEN_APK_DETAILS -> {
+                                                showApkBottomSheet = true
+                                                longClickedFile = dialogFile
+                                            }
+
+                                            else -> {
+                                                executeFileAction(
+                                                    context,
+                                                    dialogFile,
+                                                    determineFileAction(dialogFile)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             },
@@ -439,6 +463,7 @@ private fun FileItem(
 
 @Composable
 private fun FileActionBottomSheet(
+    file: File,
     onDismiss: () -> Unit,
     onAction: (FileAction) -> Unit
 ) {
@@ -452,6 +477,7 @@ private fun FileActionBottomSheet(
         FileAction.SHARE to "Share",
         FileAction.DETAILS to "Details",
         FileAction.COMPRESS to "Compress",
+        if (file.getFileType() == FileType.ARCHIVE) FileAction.EXTRACT to "Extract" else null,
         FileAction.CLONE to "Clone",
         FileAction.EDIT_WITH_CODE_EDITOR to "Edit with code editor",
         if (Clipboard.hasFile()) FileAction.CLEAR_CLIPBOARD to "Clear clipboard" else null
@@ -467,6 +493,7 @@ private fun FileActionBottomSheet(
                 FileAction.DELETE -> Icons.TwoTone.Delete
                 FileAction.EDIT_WITH_CODE_EDITOR -> Icons.TwoTone.Edit
                 FileAction.COMPRESS -> Icons.TwoTone.Compress
+                FileAction.EXTRACT -> Icons.TwoTone.Unarchive
                 FileAction.DETAILS -> Icons.TwoTone.Info
                 FileAction.CUT -> Icons.TwoTone.ContentCut
                 FileAction.COPY -> Icons.TwoTone.ContentCopy
