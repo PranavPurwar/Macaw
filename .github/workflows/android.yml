@@ -13,7 +13,7 @@ on:
 
 jobs:
   build:
-    name: Build Android App
+    name: Build Debug App
     runs-on: ubuntu-latest
 
     steps:
@@ -24,14 +24,11 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '21'
-          distribution: 'oracle'
+          distribution: 'temurin'
           cache: gradle
 
-      - name: Set up Android NDK
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r26d
-          link-to-sdk: true
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3.2.2
 
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v4
@@ -40,7 +37,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
