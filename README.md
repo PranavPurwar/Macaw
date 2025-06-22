@@ -1,6 +1,6 @@
 # Macaw - FileManager
 
-<img src="macaw.png" alt="Macaw" width="150" />
+<img src="macaw.png" alt="Macaw" height="80" />
 
 > "The best way to predict the future is to invent it." - Alan Kay
 
