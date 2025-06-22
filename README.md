@@ -1,6 +1,6 @@
 # Macaw - FileManager
 
-![Macaw](macaw.svg)
+![Macaw](macaw.png)
 
 > "The best way to predict the future is to invent it." - Alan Kay
 
