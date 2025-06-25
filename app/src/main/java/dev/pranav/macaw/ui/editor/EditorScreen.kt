@@ -59,7 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
-import dev.pranav.macaw.App
+import dev.pranav.macaw.App.Companion.prefs
 import dev.pranav.macaw.util.getLastModifiedDate
 import dev.pranav.macaw.util.sizeString
 import io.github.rosemoe.sora.event.ContentChangeEvent
@@ -69,7 +69,6 @@ import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.component.Magnifier
 import io.github.rosemoe.sora.widget.subscribeAlways
 import me.saket.cascade.CascadeDropdownMenu
-import me.saket.cascade.rememberCascadeState
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -103,9 +102,7 @@ fun EditorToolbar(file: File, editor: CodeEditor, onSave: () -> Unit) {
     var fileSize by remember { mutableStateOf(file.sizeString()) }
     var showMenu by remember { mutableStateOf(false) }
     var showGoToLineDialog by remember { mutableStateOf(false) }
-    val state = rememberCascadeState()
     val itemPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
-    val prefs = App.prefs
 
     var useICULibToSelectWords by remember { mutableStateOf(prefs.useICULibToSelectWords) }
     var showLineNumber by remember { mutableStateOf(prefs.showLineNumber) }
@@ -204,7 +201,6 @@ fun EditorToolbar(file: File, editor: CodeEditor, onSave: () -> Unit) {
                     )
                 }
                 CascadeDropdownMenu(
-                    state = state,
                     fixedWidth = 250.dp,
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },

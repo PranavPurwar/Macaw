@@ -3,42 +3,51 @@ package dev.pranav.macaw.util
 import java.io.File
 
 object Clipboard {
-    private var file: File? = null
+    private var files: List<File> = emptyList()
     private var isCut: Boolean = false
 
-    fun copy(file: File) {
-        this.file = file
+    fun copy(files: List<File>) {
+        this.files = files
         this.isCut = false
     }
 
-    fun cut(file: File) {
-        this.file = file
+    fun cut(files: List<File>) {
+        this.files = files
         this.isCut = true
     }
 
-    fun paste(destination: File): Boolean {
-        file?.let {
-            return if (isCut) {
-                val result = it.renameTo(File(destination, it.name))
-                file = null
-                result
+    fun copy(file: File) {
+        copy(listOf(file))
+    }
+
+    fun cut(file: File) {
+        cut(listOf(file))
+    }
+
+    fun paste(destination: File) {
+        files.forEach { file ->
+            val destinationFile = File(destination, file.name)
+            if (isCut) {
+                file.renameTo(destinationFile)
             } else {
-                if (it.isFile) {
-                    it.copyTo(File(destination, it.name), true).exists()
+                if (file.isFile) {
+                    file.copyTo(destinationFile, overwrite = true)
                 } else {
-                    it.copyRecursively(File(destination, it.name), true)
+                    file.copyRecursively(destinationFile, overwrite = true)
                 }
             }
         }
-        return false
+        if (isCut) {
+            clear()
+        }
     }
 
     fun hasFile(): Boolean {
-        return file != null
+        return files.isNotEmpty()
     }
 
     fun clear() {
-        file = null
+        files = emptyList()
         isCut = false
     }
 }

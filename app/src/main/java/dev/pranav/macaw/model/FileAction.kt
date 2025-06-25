@@ -1,0 +1,25 @@
+package dev.pranav.macaw.model
+
+enum class FileAction {
+    SHARE,
+    OPEN_WITH,
+    RENAME,
+    DELETE,
+    DETAILS,
+    COPY,
+    CUT,
+    PASTE,
+    COMPRESS,
+    EXTRACT,
+    CLONE,
+    OPEN_TEXT_EDITOR,
+    CLEAR_CLIPBOARD,
+    HANDLE_AUDIO,
+    OPEN_APK_DETAILS,
+    BOOKMARK,
+    UNBOOKMARK,
+    OPEN_PDF_PREVIEW,
+    OPEN_IMAGE_PREVIEW,
+    OPEN_VIDEO_PREVIEW,
+    OPEN_WITH_SYSTEM,
+}

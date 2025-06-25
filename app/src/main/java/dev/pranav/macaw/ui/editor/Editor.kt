@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
-import dev.pranav.macaw.App
+import dev.pranav.macaw.App.Companion.prefs
 import dev.pranav.macaw.util.mapFontNameToFontResource
 import io.github.rosemoe.sora.lang.EmptyLanguage
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
@@ -62,7 +62,6 @@ fun CodeEditor(
 }
 
 fun CodeEditor.applyEditorSettings(file: File) {
-    val prefs = App.prefs
     props.apply {
         useICULibToSelectWords = prefs.useICULibToSelectWords
         symbolPairAutoCompletion = prefs.symbolPairAutoCompletion
@@ -90,7 +89,7 @@ fun CodeEditor.applyEditorSettings(file: File) {
 
     val fontResource = mapFontNameToFontResource(prefs.editorFont)
     if (fontResource != null) {
-        typefaceText = ResourcesCompat.getFont(App.app, fontResource)
+        typefaceText = ResourcesCompat.getFont(this.context, fontResource)
     }
 
     setEditorLanguage(

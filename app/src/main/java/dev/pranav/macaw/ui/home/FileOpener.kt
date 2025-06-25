@@ -5,6 +5,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import dev.pranav.macaw.model.AUDIO_FORMATS
+import dev.pranav.macaw.model.FileAction
 import dev.pranav.macaw.model.FileType
 import dev.pranav.macaw.model.getFileType
 import dev.pranav.macaw.ui.editor.TextEditorActivity
@@ -13,27 +14,27 @@ import dev.pranav.macaw.ui.preview.PDFPreviewActivity
 import dev.pranav.macaw.ui.preview.VideoPreviewActivity
 import java.io.File
 
-enum class FileAction {
-    OPEN_TEXT_EDITOR,
-    OPEN_APK_DETAILS,
-    OPEN_IMAGE_PREVIEW,
-    OPEN_VIDEO_PREVIEW,
-    OPEN_PDF_PREVIEW,
-    HANDLE_AUDIO,
-    OPEN_WITH_SYSTEM,
-    SHARE,
-    OPEN_WITH,
-    CLONE,
-    RENAME,
-    DELETE,
-    EDIT_WITH_CODE_EDITOR,
-    COMPRESS,
-    EXTRACT, // added extract action
-    DETAILS,
-    CUT,
-    COPY,
-    PASTE,
-    CLEAR_CLIPBOARD
+fun handleFileClick(
+    file: File,
+    context: Context,
+    onDirectoryChange: (File) -> Unit,
+    onShowApkBottomSheet: (File) -> Unit,
+    onShowAudioPreview: (File) -> Unit,
+    onError: (String) -> Unit
+) {
+    if (file.isDirectory) {
+        if (file.canRead()) {
+            onDirectoryChange(file)
+        } else {
+            onError("Cannot read directory ${'$'}{file.name}")
+        }
+    } else {
+        when (val action = determineFileAction(file)) {
+            FileAction.HANDLE_AUDIO -> onShowAudioPreview(file)
+            FileAction.OPEN_APK_DETAILS -> onShowApkBottomSheet(file)
+            else -> executeFileAction(context, file, action)
+        }
+    }
 }
 
 fun determineFileAction(file: File): FileAction {
@@ -48,14 +49,6 @@ fun determineFileAction(file: File): FileAction {
             FileType.VIDEO -> FileAction.OPEN_VIDEO_PREVIEW
             else -> FileAction.OPEN_WITH_SYSTEM
         }
-    }
-}
-
-fun handleFileClick(context: Context, file: File, onDialogFileSelected: (File) -> Unit = {}) {
-    val action = determineFileAction(file)
-    when (action) {
-        FileAction.HANDLE_AUDIO, FileAction.OPEN_APK_DETAILS -> onDialogFileSelected(file)
-        else -> executeFileAction(context, file, action)
     }
 }
 

@@ -7,7 +7,10 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,14 +46,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
+import dev.pranav.macaw.ui.home.DetailItem
 import dev.pranav.macaw.util.sizeString
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -69,6 +76,7 @@ fun ApkBottomSheet(file: File, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var apkInfo by remember { mutableStateOf<ApkInfo?>(null) }
     var installStatus by remember { mutableStateOf<InstallStatus>(InstallStatus.NotInstalled) }
+    var isIconExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(file) {
         apkInfo = getApkInfo(context, file)
@@ -81,281 +89,338 @@ fun ApkBottomSheet(file: File, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         sheetState = sheetState
     ) {
-        SelectionContainer {
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                apkInfo?.let { info ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (info.icon != null) {
-                            Image(
-                                bitmap = info.icon.asImageBitmap(),
-                                contentDescription = "App Icon",
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Android,
-                                contentDescription = "App Icon",
-                                modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .padding(start = 16.dp)
-                                .weight(1f)
-                        ) {
-                            Text(
-                                text = info.appName ?: info.packageName,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            Text(
-                                text = info.packageName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Version: ${info.versionName} (${info.versionCode})",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (installStatus is InstallStatus.Installed) {
-                            FilledTonalButton(
-                                onClick = {
-                                    uninstallApp(context, info.packageName)
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Uninstall"
-                                )
-                                Text(
-                                    text = "Uninstall",
-                                    modifier = Modifier.padding(start = 8.dp)
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(
-                                        FileProvider.getUriForFile(
-                                            context,
-                                            "${context.packageName}.provider",
-                                            file
-                                        ), "application/vnd.android.package-archive"
-                                    )
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "Install"
-                            )
-                            Text(
-                                text = if (installStatus is InstallStatus.Installed) "Update" else "Install",
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
-                    }
-
-                    if (installStatus is InstallStatus.Installed) {
-                        TextButton(
-                            onClick = {
-                                openAppInfo(context, info.packageName)
-                            },
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Text("App Info")
-                        }
-                    }
-
-                    if (installStatus is InstallStatus.Installed) {
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Text(
-                            text = "Installation Details",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        ElevatedCard(
+        BoxWithConstraints {
+            val screenWidth = this.maxWidth
+            val screenHeight = this.maxHeight
+            SelectionContainer {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    apkInfo?.let { info ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp)
+                                .zIndex(if (isIconExpanded) 1f else 0f)
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                val installedInfo = installStatus as InstallStatus.Installed
-                                DetailItem("Installed Version", installedInfo.versionName)
-                                DetailItem(
-                                    "First Install",
-                                    formatTimestamp(installedInfo.firstInstallTime)
-                                )
-                                DetailItem(
-                                    "Last Updated",
-                                    formatTimestamp(installedInfo.lastUpdateTime)
-                                )
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-                    Text(
-                        text = "APK Details",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    ElevatedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            DetailItem("Min SDK", info.minSdkVersion.toString())
-                            DetailItem("Target SDK", info.targetSdkVersion.toString())
-                            DetailItem("Install Location", info.installLocation)
-                            info.sharedUserId?.let { DetailItem("Shared User ID", it) }
-                            DetailItem("File Size", info.fileSize)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Signatures",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    ElevatedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            info.signatures.forEachIndexed { index, signature ->
-                                Column {
-                                    Text("Issuer", fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        signature.issuer,
-                                        modifier = Modifier.padding(bottom = 8.dp)
+                            if (info.icon != null) {
+                                Box(
+                                    modifier = Modifier.size(64.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Image(
+                                        bitmap = info.icon.asImageBitmap(),
+                                        contentDescription = "App Icon",
+                                        modifier = Modifier
+                                            .graphicsLayer {
+                                                scaleX = if (isIconExpanded) 3f else 1f
+                                                scaleY = if (isIconExpanded) 3f else 1f
+                                                if (isIconExpanded) {
+                                                    translationX = (screenWidth / 2 - 48.dp).toPx()
+                                                    translationY = (screenHeight / 2 - 56.dp).toPx()
+                                                } else {
+                                                    translationX = 0f
+                                                    translationY = 0f
+                                                }
+                                            }
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .combinedClickable(
+                                                onClick = {
+                                                    if (isIconExpanded) {
+                                                        isIconExpanded = false
+                                                    }
+                                                },
+                                                onLongClick = {
+                                                    isIconExpanded = !isIconExpanded
+                                                })
                                     )
-
-                                    Text("Subject", fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        signature.subject,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                    )
-
-                                    Text("Serial", fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        signature.serialNumber,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                    )
-
-                                    Text("SHA-256", fontWeight = FontWeight.SemiBold)
-                                    Text(signature.sha256)
                                 }
-
-                                if (index < info.signatures.size - 1) {
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                                }
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Android,
+                                    contentDescription = "App Icon",
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .graphicsLayer {
+                                            scaleX = if (isIconExpanded) 3f else 1f
+                                            scaleY = if (isIconExpanded) 3f else 1f
+                                            if (isIconExpanded) {
+                                                translationX = (screenWidth / 2 - 48.dp).toPx()
+                                                translationY = (screenHeight / 2 - 56.dp).toPx()
+                                            } else {
+                                                translationX = 0f
+                                                translationY = 0f
+                                            }
+                                        }
+                                        .combinedClickable(
+                                            onClick = {
+                                                if (isIconExpanded) {
+                                                    isIconExpanded = false
+                                                }
+                                            },
+                                            onLongClick = {
+                                                isIconExpanded = !isIconExpanded
+                                            }),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
 
-                            if (info.signatures.isEmpty()) {
-                                Text("No signature information available")
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .blur(if (isIconExpanded) 8.dp else 0.dp)
+                            ) {
+                                Text(
+                                    modifier = Modifier.padding(start = 16.dp),
+                                text = info.appName ?: info.packageName,
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                                Text(
+                                    modifier = Modifier.padding(start = 16.dp),
+                                    text = info.packageName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    modifier = Modifier.padding(start = 16.dp),
+                                    text = "Version: ${info.versionName} (${info.versionCode})",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             }
                         }
-                    }
 
-                    info.metaData?.let { bundle ->
-                        if (!bundle.isEmpty) {
+                        Column(modifier = Modifier.blur(if (isIconExpanded) 8.dp else 0.dp)) {
+
                             Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (installStatus is InstallStatus.Installed) {
+                                    FilledTonalButton(
+                                        onClick = {
+                                            uninstallApp(context, info.packageName)
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Uninstall"
+                                        )
+                                        Text(
+                                            text = "Uninstall",
+                                            modifier = Modifier.padding(start = 8.dp)
+                                        )
+                                    }
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(
+                                                FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.provider",
+                                                    file
+                                                ), "application/vnd.android.package-archive"
+                                            )
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(intent)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = "Install"
+                                    )
+                                    Text(
+                                        text = if (installStatus is InstallStatus.Installed) "Update" else "Install",
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
+                            }
+
+                            if (installStatus is InstallStatus.Installed) {
+                                TextButton(
+                                    onClick = {
+                                        openAppInfo(context, info.packageName)
+                                    },
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text("App Info")
+                                }
+                            }
+
+                            if (installStatus is InstallStatus.Installed) {
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text(
+                                    text = "Installation Details",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                ElevatedCard(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        val installedInfo = installStatus as InstallStatus.Installed
+                                        DetailItem("Installed Version", installedInfo.versionName)
+                                        DetailItem(
+                                            "First Install",
+                                            formatTimestamp(installedInfo.firstInstallTime)
+                                        )
+                                        DetailItem(
+                                            "Last Updated",
+                                            formatTimestamp(installedInfo.lastUpdateTime)
+                                        )
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
                             Text(
-                                text = "Metadata",
+                                text = "APK Details",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
-                            Card(
+
+                            ElevatedCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 8.dp)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    bundle.keySet().sorted().forEach { key ->
-                                        val value = @Suppress("DEPRECATION") bundle.get(key)
-                                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                    DetailItem("Min SDK", info.minSdkVersion.toString())
+                                    DetailItem("Target SDK", info.targetSdkVersion.toString())
+                                    DetailItem("Install Location", info.installLocation)
+                                    info.sharedUserId?.let { DetailItem("Shared User ID", it) }
+                                    DetailItem("File Size", info.fileSize)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Text(
+                                text = "Signatures",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            ElevatedCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    info.signatures.forEachIndexed { index, signature ->
+                                        Column {
+                                            Text("Issuer", fontWeight = FontWeight.SemiBold)
                                             Text(
-                                                text = key,
-                                                fontWeight = FontWeight.SemiBold,
-                                                modifier = Modifier.padding(bottom = 4.dp)
+                                                signature.issuer,
+                                                modifier = Modifier.padding(bottom = 8.dp)
                                             )
-                                            Text(text = value?.toString() ?: "N/A")
+
+                                            Text("Subject", fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                signature.subject,
+                                                modifier = Modifier.padding(bottom = 8.dp)
+                                            )
+
+                                            Text("Serial", fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                signature.serialNumber,
+                                                modifier = Modifier.padding(bottom = 8.dp)
+                                            )
+
+                                            Text("SHA-256", fontWeight = FontWeight.SemiBold)
+                                            Text(signature.sha256)
+                                        }
+
+                                        if (index < info.signatures.size - 1) {
+                                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                        }
+                                    }
+
+                                    if (info.signatures.isEmpty()) {
+                                        Text("No signature information available")
+                                    }
+                                }
+                            }
+
+                            info.metaData?.let { bundle ->
+                                if (!bundle.isEmpty) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Metadata",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            bundle.keySet().sorted().forEach { key ->
+                                                val value = @Suppress("DEPRECATION") bundle.get(key)
+                                                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                                    Text(
+                                                        text = key,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        modifier = Modifier.padding(bottom = 4.dp)
+                                                    )
+                                                    Text(text = value?.toString() ?: "N/A")
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = "Permissions",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                            Text(
+                                text = "Permissions",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
 
-                    ElevatedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            info.permissions.forEach { permission ->
-                                Text(
-                                    text = "• $permission",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
+                            ElevatedCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    info.permissions.forEach { permission ->
+                                        Text(
+                                            text = "• $permission",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(vertical = 2.dp)
+                                        )
+                                    }
+
+                                    if (info.permissions.isEmpty()) {
+                                        Text("No permissions required")
+                                    }
+                                }
                             }
-
-                            if (info.permissions.isEmpty()) {
-                                Text("No permissions required")
-                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                } ?: run {
-                    Text(
-                        text = "Loading APK information...",
-                        modifier = Modifier.padding(32.dp)
-                    )
+                        Spacer(modifier = Modifier.height(24.dp))
+                    } ?: run {
+                        Text(
+                            text = "Loading APK information...",
+                            modifier = Modifier.padding(32.dp)
+                        )
+                    }
                 }
             }
         }
@@ -527,14 +592,14 @@ private fun getInstallStatus(context: Context, packageName: String): InstallStat
 
 private fun uninstallApp(context: Context, packageName: String) {
     val intent = Intent(Intent.ACTION_DELETE).apply {
-        data = "package:$packageName".toUri()
+        data = "package:${'$'}packageName".toUri()
     }
     context.startActivity(intent)
 }
 
 private fun openAppInfo(context: Context, packageName: String) {
     val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-        data = "package:$packageName".toUri()
+        data = "package:${packageName}".toUri()
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     context.startActivity(intent)

@@ -2,8 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-sdk tools:overrideLibrary="androidx.pdf,androidx.pdf.document.service,androidx.pdf.compose" />
-
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="AllFilesAccessPolicy,ScopedStorage" />
@@ -32,6 +30,7 @@
             android:name="dev.pranav.macaw.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.FileManager">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -44,22 +43,40 @@
             android:exported="true" />
         <activity
             android:name="dev.pranav.macaw.ui.editor.TextEditorActivity"
-            android:exported="true" />
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="*/*" />
+                <data android:scheme="file" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name="dev.pranav.macaw.ui.preview.ImagePreviewActivity"
             android:exported="true" />
+
         <activity
             android:name="dev.pranav.macaw.ui.preview.VideoPreviewActivity"
             android:exported="true" />
+
         <activity
             android:name="dev.pranav.macaw.ui.preview.PDFPreviewActivity"
+            android:exported="true" />
+
+        <activity
+            android:name="dev.pranav.macaw.ui.home.BookmarksActivity"
             android:exported="true" />
 
         <service
             android:name="dev.pranav.macaw.ui.preview.PlaybackService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true">
-            <intent-filter>
+
+        <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService"/>
             </intent-filter>
         </service>
@@ -77,10 +94,12 @@
             android:authorities="${applicationId}.provider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data
+
+        <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
     </application>
 
 </manifest>
