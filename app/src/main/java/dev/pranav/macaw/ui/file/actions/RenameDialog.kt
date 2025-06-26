@@ -1,4 +1,4 @@
-package dev.pranav.macaw.ui.home
+package dev.pranav.macaw.ui.file.actions
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedButton

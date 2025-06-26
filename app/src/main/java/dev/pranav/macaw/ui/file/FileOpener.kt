@@ -1,4 +1,4 @@
-package dev.pranav.macaw.ui.home
+package dev.pranav.macaw.ui.file
 
 import android.content.Context
 import android.content.Intent
@@ -9,9 +9,9 @@ import dev.pranav.macaw.model.FileAction
 import dev.pranav.macaw.model.FileType
 import dev.pranav.macaw.model.getFileType
 import dev.pranav.macaw.ui.editor.TextEditorActivity
-import dev.pranav.macaw.ui.preview.ImagePreviewActivity
-import dev.pranav.macaw.ui.preview.PDFPreviewActivity
-import dev.pranav.macaw.ui.preview.VideoPreviewActivity
+import dev.pranav.macaw.ui.file.preview.ImagePreviewActivity
+import dev.pranav.macaw.ui.file.preview.PDFPreviewActivity
+import dev.pranav.macaw.ui.file.preview.VideoPreviewActivity
 import java.io.File
 
 fun handleFileClick(
@@ -26,7 +26,7 @@ fun handleFileClick(
         if (file.canRead()) {
             onDirectoryChange(file)
         } else {
-            onError("Cannot read directory ${'$'}{file.name}")
+            onError("Cannot read directory ${file.name}")
         }
     } else {
         when (val action = determineFileAction(file)) {
@@ -99,3 +99,4 @@ private fun openWithSystemApp(context: Context, file: File) {
         Toast.makeText(context, "No app found to open this file type", Toast.LENGTH_SHORT).show()
     }
 }
+

@@ -1,11 +1,13 @@
-package dev.pranav.macaw.ui.preview
+package dev.pranav.macaw.ui.file.preview
 
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.Signature
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,7 +59,6 @@ import androidx.compose.ui.zIndex
 import androidx.core.content.FileProvider
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
-import dev.pranav.macaw.ui.home.DetailItem
 import dev.pranav.macaw.util.sizeString
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -532,7 +533,7 @@ private fun getApkInfo(context: Context, apkFile: File): ApkInfo? {
     }
 }
 
-private fun extractSignatureInfo(signature: android.content.pm.Signature): SignatureInfo? {
+private fun extractSignatureInfo(signature: Signature): SignatureInfo? {
     return try {
         val certFactory = CertificateFactory.getInstance("X.509")
         val cert =
@@ -598,7 +599,7 @@ private fun uninstallApp(context: Context, packageName: String) {
 }
 
 private fun openAppInfo(context: Context, packageName: String) {
-    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
         data = "package:${packageName}".toUri()
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }

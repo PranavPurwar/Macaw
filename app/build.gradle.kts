@@ -45,6 +45,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.ui)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     implementation(libs.androidx.core.ktx)

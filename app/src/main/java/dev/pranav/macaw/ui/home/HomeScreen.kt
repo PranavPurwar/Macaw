@@ -4,40 +4,47 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.twotone.Clear
 import androidx.compose.material.icons.twotone.ContentPaste
 import androidx.compose.material.icons.twotone.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -46,32 +53,47 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import dev.pranav.macaw.model.CloneAction
+import dev.pranav.macaw.model.CompressAction
+import dev.pranav.macaw.model.DeleteAction
+import dev.pranav.macaw.model.ExtractAction
 import dev.pranav.macaw.model.FileAction
 import dev.pranav.macaw.model.FileInfo
+import dev.pranav.macaw.model.RenameAction
 import dev.pranav.macaw.model.TabData
+import dev.pranav.macaw.service.ActionManager
+import dev.pranav.macaw.ui.actions.ActionProgressDialog
+import dev.pranav.macaw.ui.actions.ActionState
+import dev.pranav.macaw.ui.dialogs.ConflictDialog
 import dev.pranav.macaw.ui.editor.TextEditorActivity
-import dev.pranav.macaw.ui.preview.ApkBottomSheet
-import dev.pranav.macaw.ui.preview.AudioPreviewDialog
+import dev.pranav.macaw.ui.file.DetailsSheet
+import dev.pranav.macaw.ui.file.FileItem
+import dev.pranav.macaw.ui.file.FilePreviewState
+import dev.pranav.macaw.ui.file.actions.FileActionBottomSheet
+import dev.pranav.macaw.ui.file.actions.MultiFileActionBottomSheet
+import dev.pranav.macaw.ui.file.actions.RenameDialog
+import dev.pranav.macaw.ui.file.handleFileClick
+import dev.pranav.macaw.ui.file.preview.ApkBottomSheet
+import dev.pranav.macaw.ui.file.preview.AudioPreviewDialog
 import dev.pranav.macaw.util.BookmarksManager
 import dev.pranav.macaw.util.Clipboard
-import dev.pranav.macaw.util.ConflictAction
-import dev.pranav.macaw.util.clone
-import dev.pranav.macaw.util.compress
-import dev.pranav.macaw.util.deleteFile
+import dev.pranav.macaw.util.ConflictInfo
+import dev.pranav.macaw.util.ConflictResolution
 import dev.pranav.macaw.util.details
-import dev.pranav.macaw.util.extract
+import dev.pranav.macaw.util.nameWithoutExtension
 import dev.pranav.macaw.util.orderedChildren
-import dev.pranav.macaw.util.rename
 import dev.pranav.macaw.util.sortFiles
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.coroutines.resume
 
 private sealed class DialogState {
     object None : DialogState()
@@ -80,15 +102,9 @@ private sealed class DialogState {
     data class Details(val file: File) : DialogState()
     data class Apk(val file: File) : DialogState()
     data class Extract(val file: File) : DialogState()
-    data class Progress(
-        val title: String,
-        val message: String = "",
-        val progress: Float? = null
-    ) : DialogState()
-
     data class Conflict(
-        val file: File,
-        val onAction: (action: ConflictAction, applyToAll: Boolean) -> Unit
+        val conflictInfo: ConflictInfo,
+        val onAction: (action: ConflictResolution, applyToAll: Boolean) -> Unit
     ) : DialogState()
 }
 
@@ -146,136 +162,160 @@ fun HomeScreen(
         }
     }
 
-    suspend fun handleFileAction(context: Context, file: File, action: FileAction): File? =
-        withContext(Dispatchers.IO) {
-            var resultFile: File? = null
-            when (action) {
-                FileAction.SHARE -> {
-                    val uri =
-                        FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        type = context.contentResolver.getType(uri)
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                    }
-                    context.startActivity(Intent.createChooser(intent, "Share File"))
-                }
 
-                FileAction.OPEN_WITH -> {
-                    val uri =
-                        FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        setDataAndType(uri, context.contentResolver.getType(uri))
-                    }
-                    context.startActivity(Intent.createChooser(intent, "Open File"))
-                }
+    val actions by ActionManager.actions.collectAsState()
+    val reloadedActionIds = remember { mutableSetOf<Long>() }
 
-                FileAction.CLONE -> {
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.Progress("Cloning")
-                    }
-                    file.clone()
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.None
-                        Toast.makeText(context, "File cloned", Toast.LENGTH_SHORT).show()
-                    }
-                }
-
-                FileAction.DELETE -> {
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.Progress("Deleting")
-                    }
-                    if (file.deleteFile()) {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "File deleted", Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(context, "Failed to delete file", Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                    }
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.None
-                    }
-                }
-
-                FileAction.OPEN_TEXT_EDITOR -> {
-                    val intent = Intent(context, TextEditorActivity::class.java).apply {
-                        putExtra("file", file)
-                    }
-                    context.startActivity(intent)
-                }
-
-                FileAction.COMPRESS -> {
-                    val destination = File(file.parentFile, "${file.nameWithoutExtension}.zip")
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.Progress("Compressing")
-                    }
-                    file.compress(destination) { entryName, progress ->
-                        coroutineScope.launch(Dispatchers.Main) {
-                            dialogState =
-                                DialogState.Progress("Compressing", entryName, progress)
-                        }
-                    }
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.None
-                    }
-                    resultFile = destination
-                }
-
-                FileAction.EXTRACT -> {
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.Extract(file)
-                    }
-                }
-
-                FileAction.CUT -> {
-                    Clipboard.cut(file)
-                }
-
-                FileAction.COPY -> {
-                    Clipboard.copy(file)
-                }
-
-                FileAction.PASTE -> {
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.Progress("Pasting")
-                    }
-                    Clipboard.paste(tabData.currentPath)
-                    withContext(Dispatchers.Main) {
-                        dialogState = DialogState.None
-                    }
-                }
-
-                FileAction.CLEAR_CLIPBOARD -> {
-                    Clipboard.clear()
-                }
-
-                FileAction.BOOKMARK -> {
-                    BookmarksManager.addBookmark(context, file.absolutePath)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Bookmarked", Toast.LENGTH_SHORT).show()
-                    }
-                }
-
-                FileAction.UNBOOKMARK -> {
-                    BookmarksManager.removeBookmark(context, file.absolutePath)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Bookmark removed", Toast.LENGTH_SHORT).show()
-                    }
-                }
-
-                else -> {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "$action not implemented yet", Toast.LENGTH_SHORT)
-                            .show()
-                    }
+    LaunchedEffect(actions.map { it.state.value }) {
+        actions.forEach { action ->
+            if (action.state.value is ActionState.Completed && action.id !in reloadedActionIds) {
+                reloadedActionIds.add(action.id)
+                coroutineScope.launch {
+                    loadFiles()
                 }
             }
-            resultFile
         }
+    }
+    if (isCurrent) {
+        ActionProgressDialog()
+    }
+
+    fun handleFileAction(context: Context, file: File, action: FileAction): File? {
+        var resultFile: File? = null
+        when (action) {
+            FileAction.SHARE -> {
+                val uri =
+                    FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    type = context.contentResolver.getType(uri)
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                }
+                context.startActivity(Intent.createChooser(intent, "Share File"))
+            }
+
+            FileAction.OPEN_WITH -> {
+                val uri =
+                    FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    setDataAndType(uri, context.contentResolver.getType(uri))
+                }
+                context.startActivity(Intent.createChooser(intent, "Open File"))
+            }
+
+            FileAction.DELETE -> {
+                ActionManager.addAction(
+                    DeleteAction(
+                        id = System.currentTimeMillis(),
+                        files = listOf(file)
+                    )
+                )
+            }
+
+            FileAction.OPEN_TEXT_EDITOR -> {
+                val intent = Intent(context, TextEditorActivity::class.java).apply {
+                    putExtra("file", file)
+                }
+                context.startActivity(intent)
+            }
+
+            FileAction.COMPRESS -> {
+                val destination = File(file.parentFile, "${file.nameWithoutExtension()}.zip")
+                ActionManager.addAction(
+                    CompressAction(
+                        id = System.currentTimeMillis(),
+                        files = listOf(file),
+                        destination = destination
+                    )
+                )
+                resultFile = destination
+            }
+
+            FileAction.EXTRACT -> {
+                dialogState = DialogState.Extract(file)
+            }
+
+            FileAction.CLONE -> {
+                ActionManager.addAction(
+                    CloneAction(
+                        id = System.currentTimeMillis(),
+                        file = file,
+                        onConflict = { conflictInfo ->
+                            suspendCancellableCoroutine { continuation ->
+                                dialogState = DialogState.Conflict(
+                                    conflictInfo = conflictInfo,
+                                    onAction = { resolution, applyToAll ->
+                                        val finalResolution = if (applyToAll) {
+                                            when (resolution) {
+                                                ConflictResolution.SKIP -> ConflictResolution.SKIP_ALL
+                                                ConflictResolution.OVERWRITE -> ConflictResolution.OVERWRITE_ALL
+                                                else -> resolution
+                                            }
+                                        } else {
+                                            resolution
+                                        }
+                                        continuation.resume(finalResolution)
+                                    }
+                                )
+                            }
+                        }
+                    )
+                )
+            }
+
+            FileAction.CUT -> {
+                Clipboard.cut(file)
+            }
+
+            FileAction.COPY -> {
+                Clipboard.copy(file)
+            }
+
+            FileAction.PASTE -> {
+                Clipboard.paste(
+                    destination = tabData.currentPath,
+                    onConflict = { conflictInfo ->
+                        suspendCancellableCoroutine { continuation ->
+                            dialogState = DialogState.Conflict(
+                                conflictInfo = conflictInfo,
+                                onAction = { resolution, applyToAll ->
+                                    val finalResolution = if (applyToAll) {
+                                        when (resolution) {
+                                            ConflictResolution.SKIP -> ConflictResolution.SKIP_ALL
+                                            ConflictResolution.OVERWRITE -> ConflictResolution.OVERWRITE_ALL
+                                            else -> resolution
+                                        }
+                                    } else {
+                                        resolution
+                                    }
+                                    continuation.resume(finalResolution)
+                                }
+                            )
+                        }
+                    }
+                )
+            }
+
+            FileAction.CLEAR_CLIPBOARD -> {
+                Clipboard.clear()
+            }
+
+            FileAction.BOOKMARK -> {
+                BookmarksManager.addBookmark(context, file.absolutePath)
+            }
+
+            FileAction.UNBOOKMARK -> {
+                BookmarksManager.removeBookmark(context, file.absolutePath)
+            }
+
+            else -> {
+                Toast.makeText(context, "$action not implemented yet", Toast.LENGTH_SHORT)
+                    .show()
+            }
+        }
+        return resultFile
+    }
 
     when (val currentDialog = dialogState) {
         is DialogState.Apk -> ApkBottomSheet(
@@ -301,16 +341,7 @@ fun HomeScreen(
 
                                 else -> {
                                     dialogState = DialogState.None
-                                    val newFile =
-                                        handleFileAction(context, currentDialog.file, action)
-                                    loadFiles()
-                                    newFile?.let {
-                                        val index =
-                                            files.indexOfFirst { f -> f.file.absolutePath == it.absolutePath }
-                                        if (index != -1) {
-                                            tabData.lazyListState.animateScrollToItem(index)
-                                        }
-                                    }
+                                    handleFileAction(context, currentDialog.file, action)
                                 }
                             }
                         }
@@ -328,21 +359,8 @@ fun HomeScreen(
             onDismiss = { dialogState = DialogState.None }
         )
 
-        is DialogState.Rename -> RenameDialog(
-            file = currentDialog.file,
-            onDismiss = { dialogState = DialogState.None },
-            onRename = { newName ->
-                coroutineScope.launch {
-                    withContext(Dispatchers.IO) {
-                        currentDialog.file.rename(newName)
-                    }
-                    loadFiles()
-                }
-            }
-        )
-
         is DialogState.Extract -> {
-            var extractPath by remember { mutableStateOf("") }
+            var extractPath by remember { mutableStateOf(currentDialog.file.nameWithoutExtension()) }
             AlertDialog(
                 onDismissRequest = { dialogState = DialogState.None },
                 title = { Text("Extract") },
@@ -359,55 +377,44 @@ fun HomeScreen(
                 },
                 confirmButton = {
                     Button(onClick = {
-                        dialogState = DialogState.None
-                        coroutineScope.launch(Dispatchers.IO) {
-                            val destination = if (extractPath.isBlank()) {
-                                currentDialog.file.parentFile!!
+                        val destination = if (extractPath.isBlank()) {
+                            currentDialog.file.parentFile!!
+                        } else {
+                            val destinationFile = File(extractPath)
+                            if (destinationFile.isAbsolute) {
+                                destinationFile
                             } else {
-                                File(extractPath)
+                                tabData.currentPath.resolve(extractPath)
                             }
-                            val finalDestination =
-                                File(destination, currentDialog.file.nameWithoutExtension)
-
-                            var conflictAction: ConflictAction? = null
-                            var applyToAll = false
-
-                            withContext(Dispatchers.Main) {
-                                dialogState = DialogState.Progress("Extracting")
-                            }
-                            currentDialog.file.extract(
-                                destinationDir = finalDestination,
-                                onProgress = { entryName ->
-                                    coroutineScope.launch(Dispatchers.Main) {
-                                        dialogState =
-                                            DialogState.Progress("Extracting", entryName)
-                                    }
-                                },
-                                onConflict = { conflictingFile ->
-                                    if (applyToAll && conflictAction != null) {
-                                        return@extract conflictAction!!
-                                    }
-                                    val result =
-                                        CompletableDeferred<Pair<ConflictAction, Boolean>>()
-                                    coroutineScope.launch(Dispatchers.Main) {
-                                        dialogState =
-                                            DialogState.Conflict(conflictingFile) { action, all ->
-                                                result.complete(action to all)
+                        }
+                        ActionManager.addAction(
+                            ExtractAction(
+                                id = System.currentTimeMillis(),
+                                file = currentDialog.file,
+                                destination = destination,
+                                onConflict = { conflictInfo ->
+                                    suspendCancellableCoroutine { continuation ->
+                                        dialogState = DialogState.Conflict(
+                                            conflictInfo = conflictInfo,
+                                            onAction = { resolution, applyToAll ->
+                                                val finalResolution = if (applyToAll) {
+                                                    when (resolution) {
+                                                        ConflictResolution.SKIP -> ConflictResolution.SKIP_ALL
+                                                        ConflictResolution.OVERWRITE -> ConflictResolution.OVERWRITE_ALL
+                                                        else -> resolution
+                                                    }
+                                                } else {
+                                                    resolution
+                                                }
+                                                continuation.resume(finalResolution)
                                             }
+                                        )
                                     }
-                                    val (chosenAction, shouldApplyToAll) = result.await()
-                                    if (shouldApplyToAll) {
-                                        applyToAll = true
-                                        conflictAction = chosenAction
-                                    }
-                                    return@extract chosenAction
                                 }
                             )
-                            withContext(Dispatchers.Main) {
-                                dialogState = DialogState.None
-                            }
-                            loadFiles()
-                        }
+                        )
+                        dialogState = DialogState.None
+                        Toast.makeText(context, "Extraction started", Toast.LENGTH_SHORT).show()
                     }) {
                         Text("Extract")
                     }
@@ -420,78 +427,30 @@ fun HomeScreen(
             )
         }
 
-        is DialogState.Progress -> {
-            AlertDialog(
-                onDismissRequest = { /* Not dismissable */ },
-                title = { Text(currentDialog.title) },
-                text = {
-                    Column(Modifier.fillMaxWidth()) {
-                        Text(
-                            currentDialog.message,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        if (currentDialog.progress == null) {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        } else {
-                            LinearProgressIndicator(
-                                modifier = Modifier.fillMaxWidth(),
-                                progress = { currentDialog.progress }
-                            )
-                        }
-                    }
-                },
-                confirmButton = {}
-            )
-        }
+        is DialogState.Rename -> RenameDialog(
+            file = currentDialog.file,
+            onDismiss = { dialogState = DialogState.None },
+            onRename = { newName ->
+                dialogState = DialogState.None
+                ActionManager.addAction(
+                    RenameAction(
+                        id = System.currentTimeMillis(),
+                        file = currentDialog.file,
+                        newName = newName
+                    )
+                )
+            }
+        )
 
         is DialogState.Conflict -> {
-            var applyToAll by remember { mutableStateOf(false) }
-            AlertDialog(
-                onDismissRequest = { /* Not dismissable */ },
-                title = { Text("Conflict") },
-                text = {
-                    Column {
-                        Text("File already exists: ${currentDialog.file.name}")
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = applyToAll, onCheckedChange = { applyToAll = it })
-                            Text("Apply to all subsequent conflicts")
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        currentDialog.onAction(
-                            ConflictAction.OVERWRITE,
-                            applyToAll
-                        )
-                    }) {
-                        Text("Overwrite")
-                    }
-                },
-                dismissButton = {
-                    Row {
-                        TextButton(onClick = {
-                            currentDialog.onAction(
-                                ConflictAction.SKIP,
-                                applyToAll
-                            )
-                        }) {
-                            Text("Skip")
-                        }
-                        TextButton(onClick = {
-                            currentDialog.onAction(
-                                ConflictAction.ABORT,
-                                applyToAll
-                            )
-                        }) {
-                            Text("Cancel")
-                        }
-                    }
+            ConflictDialog(
+                conflictInfo = currentDialog.conflictInfo,
+                onResolution = { resolution, applyToAll ->
+                    currentDialog.onAction(resolution, applyToAll)
+                    dialogState = DialogState.None
                 }
             )
         }
-
         DialogState.None -> {}
     }
 
@@ -505,24 +464,24 @@ fun HomeScreen(
                     coroutineScope.launch {
                         when (action) {
                             FileAction.CUT -> {
-                                Clipboard.cut(selectedFiles)
+                                Clipboard.cut(selectedFiles.toList())
                                 selectionMode = false
                                 selectedFiles.clear()
                             }
 
                             FileAction.COPY -> {
-                                Clipboard.copy(selectedFiles)
+                                Clipboard.copy(selectedFiles.toList())
                                 selectionMode = false
                                 selectedFiles.clear()
                             }
 
                             FileAction.DELETE -> {
-                                dialogState = DialogState.Progress("Deleting")
-                                withContext(Dispatchers.IO) {
-                                    selectedFiles.forEach { it.deleteFile() }
-                                }
-                                dialogState = DialogState.None
-                                loadFiles()
+                                ActionManager.addAction(
+                                    DeleteAction(
+                                        id = System.currentTimeMillis(),
+                                        files = selectedFiles.toList()
+                                    )
+                                )
                                 selectionMode = false
                                 selectedFiles.clear()
                             }
@@ -530,27 +489,17 @@ fun HomeScreen(
                             FileAction.COMPRESS -> {
                                 val destination = File(
                                     tabData.currentPath,
-                                    "${selectedFiles.first().nameWithoutExtension}.zip"
+                                    "archive.zip"
                                 )
-                                withContext(Dispatchers.Main) {
-                                    dialogState = DialogState.Progress("Compressing")
-                                }
-                                withContext(Dispatchers.IO) {
-                                    selectedFiles.compress(destination) { entryName, progress ->
-                                        coroutineScope.launch(Dispatchers.Main) {
-                                            dialogState =
-                                                DialogState.Progress(
-                                                    "Compressing",
-                                                    entryName,
-                                                    progress
-                                                )
-                                        }
-                                    }
-                                }
-                                withContext(Dispatchers.Main) {
-                                    dialogState = DialogState.None
-                                }
-                                loadFiles()
+                                ActionManager.addAction(
+                                    CompressAction(
+                                        id = System.currentTimeMillis(),
+                                        files = selectedFiles.toList(),
+                                        destination = destination
+                                    )
+                                )
+                                selectionMode = false
+                                selectedFiles.clear()
                             }
 
                             else -> {}
@@ -596,34 +545,74 @@ fun HomeScreen(
         }
     }
 
-    Box(modifier = modifier) {
-        Column {
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
             if (selectionMode) {
-                Row(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
-                    Text("${selectedFiles.size} selected")
-                    Row {
-                        Icon(
-                            Icons.TwoTone.MoreVert,
-                            contentDescription = "More actions",
-                            modifier = Modifier.clickable { showMultiSelectAction = true }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${selectedFiles.size} selected",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
-                        Icon(
-                            Icons.TwoTone.Clear,
-                            contentDescription = "Clear selection",
-                            modifier = Modifier.clickable {
-                                selectionMode = false
-                                selectedFiles.clear()
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        selectionMode = false
+                                        selectedFiles.clear()
+                                    },
+                                color = MaterialTheme.colorScheme.error,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(
+                                    Icons.TwoTone.Clear,
+                                    contentDescription = "Clear selection",
+                                    modifier = Modifier.padding(8.dp),
+                                    tint = MaterialTheme.colorScheme.onError
+                                )
                             }
-                        )
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { showMultiSelectAction = true },
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(
+                                    Icons.TwoTone.MoreVert,
+                                    contentDescription = "More actions",
+                                    modifier = Modifier.padding(8.dp),
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
                     }
                 }
             }
+
             PullToRefreshBox(
                 isRefreshing = loading,
                 onRefresh = {
@@ -634,65 +623,89 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 if (loading) {
-                    Box(Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface)
+                    ) {
                         LoadingIndicator(
                             modifier = Modifier
                                 .align(Alignment.Center)
-                                .size(48.dp),
+                                .size(64.dp),
                         )
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface),
                         state = tabData.lazyListState
                     ) {
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
                         items(
                             items = files,
                             key = { it.file.absolutePath }
                         ) { fileInfo ->
                             val isSelected = selectedFiles.contains(fileInfo.file)
-                            FileItem(
-                                fileInfo = fileInfo,
-                                isSelected = isSelected,
-                                selectionMode = selectionMode,
-                                onFileClick = { clickedFile ->
-                                    if (selectionMode) {
-                                        if (isSelected) {
-                                            selectedFiles.remove(clickedFile)
-                                        } else {
-                                            selectedFiles.add(clickedFile)
-                                        }
-                                        if (selectedFiles.isEmpty()) {
-                                            selectionMode = false
-                                        }
-                                    } else {
-                                        handleFileClick(
-                                            file = clickedFile,
-                                            context = context,
-                                            onDirectoryChange = onDirectoryChange,
-                                            onShowApkBottomSheet = {
-                                                dialogState = DialogState.Apk(it)
-                                            },
-                                            onShowAudioPreview = {
-                                                filePreviewState = FilePreviewState.Audio(it)
-                                            },
-                                            onError = {
-                                                errorMessage.value = it
-                                                errorState.value = true
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                                color = when {
+                                    isSelected -> MaterialTheme.colorScheme.secondaryContainer
+                                    else -> MaterialTheme.colorScheme.surface
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                FileItem(
+                                    fileInfo = fileInfo,
+                                    isSelected = isSelected,
+                                    selectionMode = selectionMode,
+                                    onFileClick = { clickedFile ->
+                                        if (selectionMode) {
+                                            if (isSelected) {
+                                                selectedFiles.remove(clickedFile)
+                                            } else {
+                                                selectedFiles.add(clickedFile)
                                             }
-                                        )
+                                            if (selectedFiles.isEmpty()) {
+                                                selectionMode = false
+                                            }
+                                        } else {
+                                            handleFileClick(
+                                                file = clickedFile,
+                                                context = context,
+                                                onDirectoryChange = onDirectoryChange,
+                                                onShowApkBottomSheet = {
+                                                    dialogState = DialogState.Apk(it)
+                                                },
+                                                onShowAudioPreview = {
+                                                    filePreviewState = FilePreviewState.Audio(it)
+                                                },
+                                                onError = {
+                                                    errorMessage.value = it
+                                                    errorState.value = true
+                                                }
+                                            )
+                                        }
+                                    },
+                                    onFileLongClick = {
+                                        if (!selectionMode) {
+                                            selectionMode = true
+                                            selectedFiles.add(it)
+                                        }
+                                    },
+                                    onMoreClick = {
+                                        dialogState = DialogState.BottomSheet(it)
                                     }
-                                },
-                                onFileLongClick = {
-                                    if (!selectionMode) {
-                                        selectionMode = true
-                                        selectedFiles.add(it)
-                                    }
-                                },
-                                onMoreClick = {
-                                    dialogState = DialogState.BottomSheet(it)
-                                }
-                            )
+                                )
+                            }
+                        }
+                        item {
+                            Spacer(modifier = Modifier.height(100.dp))
                         }
                     }
                 }
@@ -711,20 +724,46 @@ fun HomeScreen(
         }
         if (Clipboard.hasFile()) {
             Box(modifier = Modifier.fillMaxSize()) {
-                FloatingActionButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            withContext(Dispatchers.IO) {
-                                Clipboard.paste(tabData.currentPath)
-                            }
-                            loadFiles()
-                        }
-                    },
+                ExtendedFloatingActionButton(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(16.dp)
+                        .padding(16.dp),
+                    onClick = {
+                        Clipboard.paste(
+                            destination = tabData.currentPath,
+                            onConflict = { conflictInfo ->
+                                suspendCancellableCoroutine { continuation ->
+                                    dialogState = DialogState.Conflict(
+                                        conflictInfo = conflictInfo,
+                                        onAction = { resolution, applyToAll ->
+                                            val finalResolution = if (applyToAll) {
+                                                when (resolution) {
+                                                    ConflictResolution.SKIP -> ConflictResolution.SKIP_ALL
+                                                    ConflictResolution.OVERWRITE -> ConflictResolution.OVERWRITE_ALL
+                                                    else -> resolution
+                                                }
+                                            } else {
+                                                resolution
+                                            }
+                                            continuation.resume(finalResolution)
+                                        }
+                                    )
+                                }
+                            }
+                        )
+                    },
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 8.dp,
+                        pressedElevation = 12.dp
+                    )
                 ) {
-                    Icon(Icons.TwoTone.ContentPaste, contentDescription = "Paste")
+                    Icon(
+                        Icons.TwoTone.ContentPaste,
+                        contentDescription = "Paste",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Paste")
                 }
             }
         }

@@ -1,4 +1,4 @@
-package dev.pranav.macaw.ui.home
+package dev.pranav.macaw.ui.file
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -88,3 +88,4 @@ fun FileItem(
         }
     }
 }
+

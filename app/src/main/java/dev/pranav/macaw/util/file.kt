@@ -70,22 +70,155 @@ fun File.orderedChildren(sortOrder: SortOrder = SortOrder.NAME_ASCENDING): List<
     })
 }
 
-fun File.deleteFile(): Boolean {
-    return if (isDirectory) {
-        deleteRecursively()
+private const val DEFAULT_BUFFER_SIZE = 8 * 1024
+
+fun File.deleteFile(
+    onProgress: ((String, Float) -> Unit)? = null,
+    shouldContinue: () -> Boolean = { true }
+): Boolean {
+    if (!exists()) {
+        onProgress?.invoke(name, 1.0f)
+        return true
+    }
+    if (isDirectory) {
+        val files = walkBottomUp().toList()
+        val total = files.size
+        if (total == 0) {
+            onProgress?.invoke(name, 1.0f)
+            return delete()
+        }
+        for ((index, file) in files.withIndex()) {
+            if (!shouldContinue()) return false
+            if (!file.delete()) {
+                return false
+            }
+            onProgress?.invoke(file.name, (index + 1).toFloat() / total)
+        }
+        return true
     } else {
-        delete()
+        if (!shouldContinue()) return false
+        val result = delete()
+        if (result) {
+            onProgress?.invoke(name, 1f)
+        }
+        return result
     }
 }
 
-fun File.rename(newName: String): Boolean {
-    val newFile = File(parent, newName)
-    return renameTo(newFile)
+suspend fun File.copyRecursivelyWithConflictResolution(
+    target: File,
+    onProgress: (fileName: String, progress: Float) -> Unit,
+    onConflict: suspend (ConflictInfo) -> ConflictResolution,
+    shouldContinue: () -> Boolean = { true }
+): Boolean {
+    if (!exists() || target.absolutePath == absolutePath) return false // when some idiot tries to copy a file to its own path itself
+
+    var globalConflictResolution: ConflictResolution? = null
+
+    walkTopDown().filter { it.isDirectory }.forEach {
+        if (!shouldContinue()) return false
+        val relativePath = it.relativeTo(this)
+        val destinationFile = File(target, relativePath.path)
+
+        if (destinationFile.exists() && destinationFile.isFile) {
+            val resolution = globalConflictResolution ?: onConflict(
+                ConflictInfo(destinationFile, it.name, it.length(), "copy")
+            )
+
+            when (resolution) {
+                ConflictResolution.ABORT -> return false
+                ConflictResolution.SKIP, ConflictResolution.SKIP_ALL -> {
+                    if (resolution == ConflictResolution.SKIP_ALL) {
+                        globalConflictResolution = ConflictResolution.SKIP_ALL
+                    }
+                    return@forEach
+                }
+
+                ConflictResolution.OVERWRITE, ConflictResolution.OVERWRITE_ALL -> {
+                    if (resolution == ConflictResolution.OVERWRITE_ALL) {
+                        globalConflictResolution = ConflictResolution.OVERWRITE_ALL
+                    }
+                    destinationFile.delete()
+                }
+
+                ConflictResolution.RENAME -> {
+                    return@forEach
+                }
+            }
+        }
+
+        destinationFile.mkdirs()
+    }
+
+    val sourceFiles = walkTopDown().filter { it.isFile }.toList()
+    val totalSize = sourceFiles.sumOf { it.length() }
+    var copiedSize = 0L
+
+    if (totalSize == 0L) {
+        onProgress("", 1f)
+        return true
+    }
+
+    for (sourceFile in sourceFiles) {
+        if (!shouldContinue()) return false
+        val relativePath = sourceFile.relativeTo(this)
+        var destinationFile = File(target, relativePath.path)
+
+        if (destinationFile.exists()) {
+            val resolution = globalConflictResolution ?: onConflict(
+                ConflictInfo(destinationFile, sourceFile.name, sourceFile.length(), "copy")
+            )
+
+            when (resolution) {
+                ConflictResolution.ABORT -> return false
+                ConflictResolution.SKIP, ConflictResolution.SKIP_ALL -> {
+                    if (resolution == ConflictResolution.SKIP_ALL) {
+                        globalConflictResolution = ConflictResolution.SKIP_ALL
+                    }
+                    continue
+                }
+
+                ConflictResolution.OVERWRITE, ConflictResolution.OVERWRITE_ALL -> {
+                    if (resolution == ConflictResolution.OVERWRITE_ALL) {
+                        globalConflictResolution = ConflictResolution.OVERWRITE_ALL
+                    }
+                    destinationFile.delete()
+                }
+
+                ConflictResolution.RENAME -> {
+                    destinationFile = File(
+                        destinationFile.parent,
+                        destinationFile.duplicateName()
+                    )
+                }
+            }
+        }
+
+        try {
+            sourceFile.inputStream().use { input ->
+                destinationFile.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var length: Int
+                    while (input.read(buffer).also { length = it } > 0) {
+                        if (!shouldContinue()) return false
+                        output.write(buffer, 0, length)
+                        copiedSize += length
+                        onProgress(
+                            sourceFile.name,
+                            copiedSize.toFloat() / totalSize.toFloat()
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            return false
+        }
+    }
+    return true
 }
 
-
 fun File.nameWithoutExtension(): String {
-    return this.nameWithoutExtension.ifEmpty { this.name }
+    return if (isDirectory) name else nameWithoutExtension.ifEmpty { this.name }
 }
 
 fun File.duplicateName(): String {
@@ -95,7 +228,7 @@ fun File.duplicateName(): String {
     while (File(parent, "$newName ($count)").exists()) {
         count++
     }
-    return "$newName ($count)" + if (extension.isNotEmpty()) ".${extension}" else ""
+    return "$newName ($count)" + if (isFile && extension.isNotEmpty()) ".${extension}" else ""
 }
 
 fun File.clone(): File {

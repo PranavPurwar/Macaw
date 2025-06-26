@@ -1,4 +1,4 @@
-package dev.pranav.macaw.ui.home
+package dev.pranav.macaw.ui.file
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -129,3 +129,4 @@ fun SortMenu(
         )
     }
 }
+

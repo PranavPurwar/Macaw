@@ -1,4 +1,4 @@
-package dev.pranav.macaw.ui.home
+package dev.pranav.macaw.ui.file
 
 import java.io.File
 
@@ -6,4 +6,3 @@ sealed class FilePreviewState {
     object None : FilePreviewState()
     data class Audio(val file: File) : FilePreviewState()
 }
-

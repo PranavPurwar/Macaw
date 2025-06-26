@@ -26,11 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import dev.pranav.macaw.model.FileAction
+import dev.pranav.macaw.service.ActionService
+import dev.pranav.macaw.ui.bookmarks.BookmarksActivity
 import dev.pranav.macaw.ui.editor.resolveTheme
-import dev.pranav.macaw.ui.home.BookmarksActivity
+import dev.pranav.macaw.ui.file.determineFileAction
+import dev.pranav.macaw.ui.file.executeFileAction
 import dev.pranav.macaw.ui.home.FileExplorerHomeScreen
-import dev.pranav.macaw.ui.home.determineFileAction
-import dev.pranav.macaw.ui.home.executeFileAction
 import dev.pranav.macaw.ui.theme.FileManagerTheme
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
                 FileManagerApp()
             }
         }
+        startService(Intent(this, ActionService::class.java))
     }
 }
 

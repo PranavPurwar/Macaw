@@ -1,4 +1,4 @@
-package dev.pranav.macaw.ui.home
+package dev.pranav.macaw.ui.file
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -99,29 +99,25 @@ fun DetailsSheet(file: File, onDismiss: () -> Unit) {
                     try {
                         val attrs =
                             Files.readAttributes(file.toPath(), PosixFileAttributes::class.java)
-                        item {
-                            DetailItem(
-                                "Permissions",
-                                PosixFilePermissions.toString(attrs.permissions())
-                            )
-                        }
+                        val perms = PosixFilePermissions.toString(attrs.permissions())
+                        item { DetailItem("Permissions", perms) }
                         item { DetailItem("Owner", attrs.owner().name) }
-                        item { DetailItem("Group", attrs.group().name) }
-                    } catch (_: Exception) {
-                        item { DetailItem("Permissions", "Not available") }
-                        item { DetailItem("Owner", "Not available") }
-                        item { DetailItem("Group", "Not available") }
+                    } catch (e: Exception) {
+                        // Ignore
                     }
 
                     if (file.isFile) {
-                        item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
-                        item {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                HashDetailItem("MD5", md5 ?: "Calculating...")
-                                HashDetailItem("SHA1", sha1 ?: "Calculating...")
-                                HashDetailItem("SHA256", sha256 ?: "Calculating...")
-                                HashDetailItem("SHA512", sha512 ?: "Calculating...")
-                            }
+                        if (md5 != null) {
+                            item { DetailItem("MD5", md5!!) }
+                        }
+                        if (sha1 != null) {
+                            item { DetailItem("SHA-1", sha1!!) }
+                        }
+                        if (sha256 != null) {
+                            item { DetailItem("SHA-256", sha256!!) }
+                        }
+                        if (sha512 != null) {
+                            item { DetailItem("SHA-512", sha512!!) }
                         }
                     }
                 }
@@ -131,29 +127,13 @@ fun DetailsSheet(file: File, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun DetailItem(label: String, value: String) {
+private fun DetailItem(name: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = label,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(end = 8.dp)
-        )
-        Text(text = value)
-    }
-}
-
-@Composable
-fun HashDetailItem(label: String, value: String) {
-    Column {
-        Text(text = label, fontWeight = FontWeight.SemiBold)
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Text(name, fontWeight = FontWeight.Bold)
+        Text(value)
     }
 }
 

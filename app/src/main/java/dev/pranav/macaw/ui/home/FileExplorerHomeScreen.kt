@@ -21,6 +21,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
@@ -61,6 +62,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.pranav.macaw.model.TabData
 import dev.pranav.macaw.model.name
+import dev.pranav.macaw.ui.actions.ActionsActivity
+import dev.pranav.macaw.ui.file.SortMenu
 import dev.pranav.macaw.ui.settings.SettingsActivity
 import dev.pranav.macaw.util.SortOrder
 import dev.pranav.macaw.util.details
@@ -149,6 +152,17 @@ fun FileExplorerHomeScreen(
                         onNavigateToBookmarks()
                     }
                 )
+                NavigationDrawerItem(
+                    label = { Text("Ongoing Actions") },
+                    selected = false,
+                    onClick = {
+                        context.startActivity(Intent(context, ActionsActivity::class.java))
+                        coroutineScope.launch { drawerState.close() }
+                    },
+                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) }
+                )
+                HorizontalDivider()
+                Text("Storage", modifier = Modifier.padding(16.dp))
             }
         }
     ) {
@@ -226,7 +240,6 @@ private fun FileExplorerAppBar(
     val context = LocalContext.current
     var pathDetails by remember { mutableStateOf("") }
     val activeTab = tabs.getOrNull(activeTabIndex)
-    val coroutineScope = rememberCoroutineScope()
     var showSortMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(activeTab) {

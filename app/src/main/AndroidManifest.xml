@@ -56,23 +56,31 @@
         </activity>
 
         <activity
-            android:name="dev.pranav.macaw.ui.preview.ImagePreviewActivity"
+            android:name="dev.pranav.macaw.ui.file.preview.ImagePreviewActivity"
             android:exported="true" />
 
         <activity
-            android:name="dev.pranav.macaw.ui.preview.VideoPreviewActivity"
+            android:name="dev.pranav.macaw.ui.file.preview.VideoPreviewActivity"
             android:exported="true" />
 
         <activity
-            android:name="dev.pranav.macaw.ui.preview.PDFPreviewActivity"
+            android:name="dev.pranav.macaw.ui.file.preview.PDFPreviewActivity"
             android:exported="true" />
 
         <activity
-            android:name="dev.pranav.macaw.ui.home.BookmarksActivity"
+            android:name="dev.pranav.macaw.ui.bookmarks.BookmarksActivity"
             android:exported="true" />
+
+        <activity
+            android:name="dev.pranav.macaw.ui.actions.ActionsActivity"
+            android:exported="false" />
 
         <service
-            android:name="dev.pranav.macaw.ui.preview.PlaybackService"
+            android:name="dev.pranav.macaw.service.ActionService"
+            android:exported="false" />
+
+        <service
+            android:name="dev.pranav.macaw.ui.file.preview.PlaybackService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true">
 

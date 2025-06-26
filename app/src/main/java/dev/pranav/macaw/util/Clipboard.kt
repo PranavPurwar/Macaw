@@ -1,5 +1,8 @@
 package dev.pranav.macaw.util
 
+import dev.pranav.macaw.model.CopyAction
+import dev.pranav.macaw.model.MoveAction
+import dev.pranav.macaw.service.ActionManager
 import java.io.File
 
 object Clipboard {
@@ -25,21 +28,30 @@ object Clipboard {
     }
 
     fun paste(destination: File) {
-        files.forEach { file ->
-            val destinationFile = File(destination, file.name)
-            if (isCut) {
-                file.renameTo(destinationFile)
-            } else {
-                if (file.isFile) {
-                    file.copyTo(destinationFile, overwrite = true)
-                } else {
-                    file.copyRecursively(destinationFile, overwrite = true)
-                }
-            }
+        paste(destination, null)
+    }
+
+    fun paste(
+        destination: File,
+        onConflict: (suspend (ConflictInfo) -> ConflictResolution)? = null
+    ) {
+        val action = if (isCut) {
+            MoveAction(
+                id = System.currentTimeMillis(),
+                files = files,
+                destination = destination,
+                onConflict = onConflict ?: { ConflictResolution.OVERWRITE }
+            )
+        } else {
+            CopyAction(
+                id = System.currentTimeMillis(),
+                files = files,
+                destination = destination,
+                onConflict = onConflict ?: { ConflictResolution.OVERWRITE }
+            )
         }
-        if (isCut) {
-            clear()
-        }
+        ActionManager.addAction(action)
+        if (isCut) clear()
     }
 
     fun hasFile(): Boolean {

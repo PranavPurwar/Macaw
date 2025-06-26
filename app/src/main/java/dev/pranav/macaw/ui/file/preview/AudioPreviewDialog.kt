@@ -1,4 +1,4 @@
-package dev.pranav.macaw.ui.preview
+package dev.pranav.macaw.ui.file.preview
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -73,6 +74,7 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import dev.pranav.macaw.MainActivity
+import dev.pranav.macaw.util.nameWithoutExtension
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -112,7 +114,7 @@ fun AudioPreviewDialog(audioFile: File, onDismiss: () -> Unit) {
         val intent = Intent(context, PlaybackService::class.java).apply {
             action = PlaybackService.ACTION_PLAY
             putExtra(PlaybackService.EXTRA_AUDIO_FILE_PATH, audioFile.absolutePath)
-            putExtra(PlaybackService.EXTRA_AUDIO_TITLE, audioFile.nameWithoutExtension)
+            putExtra(PlaybackService.EXTRA_AUDIO_TITLE, audioFile.nameWithoutExtension())
         }
         context.startService(intent)
 
@@ -527,7 +529,7 @@ class PlaybackService : MediaSessionService() {
         currentPlaylistIndex = index
 
         player?.apply {
-            setMediaItem(createMediaItem(file.absolutePath, file.nameWithoutExtension))
+            setMediaItem(createMediaItem(file.absolutePath, file.nameWithoutExtension()))
             prepare()
             playWhenReady = true
         }
@@ -568,7 +570,7 @@ class PlaybackService : MediaSessionService() {
             _playerState.value = PlayerState(
                 isPlaying = currentPlayer.isPlaying,
                 position = currentPlayer.currentPosition.coerceAtLeast(0L),
-                duration = if (currentPlayer.duration == androidx.media3.common.C.TIME_UNSET) 0L
+                duration = if (currentPlayer.duration == C.TIME_UNSET) 0L
                 else currentPlayer.duration.coerceAtLeast(0L),
                 currentMediaItem = currentPlayer.currentMediaItem,
                 currentFilePath = currentPlayer.currentMediaItem?.mediaId,

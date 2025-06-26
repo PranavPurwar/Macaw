@@ -1,4 +1,4 @@
-package dev.pranav.macaw.ui.preview
+package dev.pranav.macaw.ui.file.preview
 
 import android.os.Build
 import android.os.Bundle
