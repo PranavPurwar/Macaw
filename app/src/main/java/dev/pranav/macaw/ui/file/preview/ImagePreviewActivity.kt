@@ -1,6 +1,5 @@
 package dev.pranav.macaw.ui.file.preview
 
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -37,7 +36,12 @@ import me.saket.telephoto.zoomable.ZoomSpec
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.rememberZoomableState
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.isReadable
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.name
 
 class ImagePreviewActivity : ComponentActivity() {
 
@@ -46,24 +50,20 @@ class ImagePreviewActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val file = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getSerializableExtra("file", File::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getSerializableExtra("file") as? File
-        }
-        var files = emptyList<File>()
+        val file = Path(intent.getStringExtra("file") ?: "")
+        var files = emptyList<Path>()
         var imagesInDir = 0
         var fileIndex = 0
 
-        val parentDirectory = file?.parentFile
-        if (parentDirectory != null && parentDirectory.canRead()) {
-            files = parentDirectory.orderedChildren().filter { it.isFile && it.getFileType() == FileType.IMAGE }
+        val parentDirectory = file.parent
+        if (parentDirectory != null && parentDirectory.isReadable()) {
+            files = parentDirectory.orderedChildren()
+                .filter { it.isRegularFile() && it.getFileType() == FileType.IMAGE }
             imagesInDir = files.size
             fileIndex = files.indexOfFirst { it.name == file.name }
         }
 
-        if (file == null) {
+        if (file.isRegularFile().not() || file.getFileType() != FileType.IMAGE) {
             Toast.makeText(this, "Error: File not found", Toast.LENGTH_LONG).show()
             finish()
             return
@@ -101,7 +101,7 @@ class ImagePreviewActivity : ComponentActivity() {
                         HorizontalPager(
                             modifier = Modifier.weight(1f),
                             state = pagerState,
-                            key = { files[it].absolutePath },
+                            key = { files[it].absolutePathString() },
                             snapPosition = SnapPosition.Center
                         ) { page ->
                             if (page < 0 || page >= files.size) {
@@ -121,7 +121,7 @@ class ImagePreviewActivity : ComponentActivity() {
                             ZoomableAsyncImage(
                                 modifier = Modifier
                                     .fillMaxSize(),
-                                model = currentFile,
+                                model = currentFile.toFile(),
                                 state = zoomableState,
                                 contentDescription = currentFile.name
                             )

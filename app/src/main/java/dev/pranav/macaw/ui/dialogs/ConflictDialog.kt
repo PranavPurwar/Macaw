@@ -25,6 +25,7 @@ import dev.pranav.macaw.util.ConflictInfo
 import dev.pranav.macaw.util.ConflictResolution
 import dev.pranav.macaw.util.details
 import dev.pranav.macaw.util.sizeString
+import kotlin.io.path.fileSize
 
 @Composable
 fun ConflictDialog(
@@ -72,12 +73,12 @@ fun ConflictDialog(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = conflictInfo.existingFile.sizeString(),
+                            text = conflictInfo.existingFile.fileSize().sizeString(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = conflictInfo.existingFile.details(),
+                            text = conflictInfo.existingFile.toFile().details(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

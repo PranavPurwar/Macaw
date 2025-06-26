@@ -3,36 +3,36 @@ package dev.pranav.macaw.util
 import dev.pranav.macaw.model.CopyAction
 import dev.pranav.macaw.model.MoveAction
 import dev.pranav.macaw.service.ActionManager
-import java.io.File
+import java.nio.file.Path
 
 object Clipboard {
-    private var files: List<File> = emptyList()
+    private var files: List<Path> = emptyList()
     private var isCut: Boolean = false
 
-    fun copy(files: List<File>) {
+    fun copy(files: List<Path>) {
         this.files = files
         this.isCut = false
     }
 
-    fun cut(files: List<File>) {
+    fun cut(files: List<Path>) {
         this.files = files
         this.isCut = true
     }
 
-    fun copy(file: File) {
+    fun copy(file: Path) {
         copy(listOf(file))
     }
 
-    fun cut(file: File) {
+    fun cut(file: Path) {
         cut(listOf(file))
     }
 
-    fun paste(destination: File) {
+    fun paste(destination: Path) {
         paste(destination, null)
     }
 
     fun paste(
-        destination: File,
+        destination: Path,
         onConflict: (suspend (ConflictInfo) -> ConflictResolution)? = null
     ) {
         val action = if (isCut) {

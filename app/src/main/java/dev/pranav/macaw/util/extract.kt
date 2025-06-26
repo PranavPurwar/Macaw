@@ -5,7 +5,18 @@ import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.ArchiveEntry
 import org.apache.commons.compress.archivers.ArchiveInputStream
 import org.apache.commons.compress.archivers.ArchiveStreamFactory
-import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.deleteRecursively
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.fileSize
+import kotlin.io.path.inputStream
+import kotlin.io.path.isDirectory
+import kotlin.io.path.nameWithoutExtension
+import kotlin.io.path.outputStream
 
 sealed class ConflictResolution {
     object OVERWRITE : ConflictResolution()
@@ -17,33 +28,34 @@ sealed class ConflictResolution {
 }
 
 data class ConflictInfo(
-    val existingFile: File,
+    val existingFile: Path,
     val newFileName: String,
     val newFileSize: Long,
     val operation: String // "extract", "copy", "move"
 )
 
-suspend fun File.extract(
-    destinationDir: File,
+@OptIn(ExperimentalPathApi::class)
+suspend fun Path.extract(
+    destinationDir: Path,
     onProgress: (entryName: String, progress: Float) -> Unit,
     onConflict: suspend (ConflictInfo) -> ConflictResolution,
     shouldContinue: () -> Boolean = { true }
 ) = withContext(Dispatchers.IO) {
-    if (!destinationDir.exists()) destinationDir.mkdirs()
+    if (!destinationDir.exists()) Files.createDirectories(destinationDir)
 
     var globalConflictResolution: ConflictResolution? = null
 
     try {
         val stream: ArchiveInputStream<out ArchiveEntry> =
             ArchiveStreamFactory().createArchiveInputStream(inputStream().buffered())
-        val totalSize = length()
+        val totalSize = fileSize()
 
         stream.use { archiveStream ->
             while (true) {
                 if (!shouldContinue()) break
                 val entry = archiveStream.nextEntry ?: break
                 onProgress(entry.name, archiveStream.bytesRead.toFloat() / totalSize)
-                val outFile = File(destinationDir, entry.name)
+                var outFile = destinationDir.resolve(entry.name)
 
                 if (outFile.exists()) {
                     val resolution = globalConflictResolution ?: onConflict(
@@ -63,10 +75,10 @@ suspend fun File.extract(
                             if (resolution == ConflictResolution.OVERWRITE_ALL) {
                                 globalConflictResolution = ConflictResolution.OVERWRITE_ALL
                             }
-                            if (outFile.isDirectory) {
+                            if (outFile.isDirectory()) {
                                 outFile.deleteRecursively()
                             } else {
-                                outFile.delete()
+                                outFile.deleteIfExists()
                             }
                         }
 
@@ -75,25 +87,21 @@ suspend fun File.extract(
                             val nameWithoutExt = outFile.nameWithoutExtension
                             val extension =
                                 if (outFile.extension.isNotEmpty()) ".${outFile.extension}" else ""
-
+                            var renamedFile: Path
                             do {
-                                val newFile =
-                                    File(outFile.parent, "${nameWithoutExt} ($counter)$extension")
+                                renamedFile =
+                                    outFile.parent.resolve("${nameWithoutExt} ($counter)$extension")
                                 counter++
-                                if (!newFile.exists()) {
-                                    // Update outFile to the new name
-                                    val newEntry = File(destinationDir, newFile.name)
-                                    break
-                                }
-                            } while (true)
+                            } while (renamedFile.exists())
+                            outFile = renamedFile
                         }
                     }
                 }
 
                 if (entry.isDirectory) {
-                    outFile.mkdirs()
+                    Files.createDirectories(outFile)
                 } else {
-                    outFile.parentFile?.mkdirs()
+                    Files.createDirectories(outFile.parent)
                     outFile.outputStream().use { output ->
                         val buffer = ByteArray(8 * 1024)
                         var length: Int

@@ -1,7 +1,6 @@
 package dev.pranav.macaw.ui.file.preview
 
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -30,20 +29,18 @@ import me.saket.telephoto.zoomable.OverzoomEffect
 import me.saket.telephoto.zoomable.ZoomSpec
 import me.saket.telephoto.zoomable.rememberZoomableState
 import me.saket.telephoto.zoomable.zoomable
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.Path
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isReadable
 
 class VideoPreviewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val file = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getSerializableExtra("file", File::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getSerializableExtra("file") as? File
-        }
+        val file = Path(intent.getStringExtra("file") ?: "")
 
-        if (file == null || !file.canRead() || file.isDirectory) {
+        if (file == null || !file.isReadable() || file.isDirectory()) {
             Toast.makeText(this, "Invalid video file", Toast.LENGTH_SHORT).show()
             finish()
             return
@@ -64,11 +61,11 @@ class VideoPreviewActivity : ComponentActivity() {
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoPlayer(file: File) {
+fun VideoPlayer(file: Path) {
     val context = LocalContext.current
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
+            val mediaItem = MediaItem.fromUri(Uri.fromFile(file.toFile()))
             setMediaItem(mediaItem)
             prepare()
             playWhenReady = true

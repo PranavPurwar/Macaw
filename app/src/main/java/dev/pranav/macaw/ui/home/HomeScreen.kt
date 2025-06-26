@@ -63,7 +63,6 @@ import dev.pranav.macaw.model.CompressAction
 import dev.pranav.macaw.model.DeleteAction
 import dev.pranav.macaw.model.ExtractAction
 import dev.pranav.macaw.model.FileAction
-import dev.pranav.macaw.model.FileInfo
 import dev.pranav.macaw.model.RenameAction
 import dev.pranav.macaw.model.TabData
 import dev.pranav.macaw.service.ActionManager
@@ -84,24 +83,27 @@ import dev.pranav.macaw.util.BookmarksManager
 import dev.pranav.macaw.util.Clipboard
 import dev.pranav.macaw.util.ConflictInfo
 import dev.pranav.macaw.util.ConflictResolution
-import dev.pranav.macaw.util.details
-import dev.pranav.macaw.util.nameWithoutExtension
-import dev.pranav.macaw.util.orderedChildren
+import dev.pranav.macaw.util.orderedChildrenNative
 import dev.pranav.macaw.util.sortFiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.io.File
+import java.nio.file.Path
+import java.nio.file.Paths
 import kotlin.coroutines.resume
+import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.isReadable
+import kotlin.io.path.nameWithoutExtension
 
 private sealed class DialogState {
     object None : DialogState()
-    data class BottomSheet(val file: File) : DialogState()
-    data class Rename(val file: File) : DialogState()
-    data class Details(val file: File) : DialogState()
-    data class Apk(val file: File) : DialogState()
-    data class Extract(val file: File) : DialogState()
+    data class BottomSheet(val path: Path) : DialogState()
+    data class Rename(val path: Path) : DialogState()
+    data class Details(val path: Path) : DialogState()
+    data class Apk(val path: Path) : DialogState()
+    data class Extract(val path: Path) : DialogState()
     data class Conflict(
         val conflictInfo: ConflictInfo,
         val onAction: (action: ConflictResolution, applyToAll: Boolean) -> Unit
@@ -115,7 +117,7 @@ private sealed class DialogState {
 fun HomeScreen(
     modifier: Modifier,
     tabData: TabData,
-    onDirectoryChange: (File) -> Unit,
+    onDirectoryChange: (Path) -> Unit,
     isCurrent: Boolean
 ) {
     val files = remember { tabData.files }
@@ -130,7 +132,7 @@ fun HomeScreen(
     var dialogState by remember { mutableStateOf<DialogState>(DialogState.None) }
 
     var selectionMode by remember { mutableStateOf(false) }
-    val selectedFiles = remember { mutableStateListOf<File>() }
+    val selectedPaths = remember { mutableStateListOf<Path>() }
     var showMultiSelectAction by remember { mutableStateOf(false) }
 
     suspend fun loadFiles(firstLoad: Boolean = false) {
@@ -140,14 +142,12 @@ fun HomeScreen(
         }
         try {
             val children = withContext(Dispatchers.IO) {
-                tabData.currentPath.orderedChildren(tabData.sortOrder).map { file ->
-                    FileInfo(file, file.details())
-                }
+                tabData.currentPath.orderedChildrenNative(tabData.sortOrder)
             }
             withContext(Dispatchers.Main) {
                 files.clear()
                 files.addAll(children)
-                tabData.loadedPath = tabData.currentPath.absolutePath
+                tabData.loadedPath = tabData.currentPath.absolutePathString()
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
@@ -180,12 +180,16 @@ fun HomeScreen(
         ActionProgressDialog()
     }
 
-    fun handleFileAction(context: Context, file: File, action: FileAction): File? {
-        var resultFile: File? = null
+    fun handleFileAction(context: Context, rename: Path, action: FileAction): Path? {
+        var resultPath: Path? = null
         when (action) {
             FileAction.SHARE -> {
                 val uri =
-                    FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                    FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.provider",
+                        rename.toFile()
+                    )
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     type = context.contentResolver.getType(uri)
@@ -196,7 +200,11 @@ fun HomeScreen(
 
             FileAction.OPEN_WITH -> {
                 val uri =
-                    FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                    FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.provider",
+                        rename.toFile()
+                    )
                 val intent = Intent(Intent.ACTION_VIEW).apply {
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     setDataAndType(uri, context.contentResolver.getType(uri))
@@ -208,39 +216,40 @@ fun HomeScreen(
                 ActionManager.addAction(
                     DeleteAction(
                         id = System.currentTimeMillis(),
-                        files = listOf(file)
+                        files = listOf(rename)
                     )
                 )
             }
 
             FileAction.OPEN_TEXT_EDITOR -> {
                 val intent = Intent(context, TextEditorActivity::class.java).apply {
-                    putExtra("file", file)
+                    putExtra("file", rename.absolutePathString())
                 }
                 context.startActivity(intent)
             }
 
             FileAction.COMPRESS -> {
-                val destination = File(file.parentFile, "${file.nameWithoutExtension()}.zip")
+                val destination = rename.parent.resolve("${rename.nameWithoutExtension}.zip")
+                    ?: Paths.get(rename.toAbsolutePath().toString() + ".zip")
                 ActionManager.addAction(
                     CompressAction(
                         id = System.currentTimeMillis(),
-                        files = listOf(file),
+                        files = listOf(rename),
                         destination = destination
                     )
                 )
-                resultFile = destination
+                resultPath = destination
             }
 
             FileAction.EXTRACT -> {
-                dialogState = DialogState.Extract(file)
+                dialogState = DialogState.Extract(rename)
             }
 
             FileAction.CLONE -> {
                 ActionManager.addAction(
                     CloneAction(
                         id = System.currentTimeMillis(),
-                        file = file,
+                        path = rename,
                         onConflict = { conflictInfo ->
                             suspendCancellableCoroutine { continuation ->
                                 dialogState = DialogState.Conflict(
@@ -265,11 +274,11 @@ fun HomeScreen(
             }
 
             FileAction.CUT -> {
-                Clipboard.cut(file)
+                Clipboard.cut(rename)
             }
 
             FileAction.COPY -> {
-                Clipboard.copy(file)
+                Clipboard.copy(rename)
             }
 
             FileAction.PASTE -> {
@@ -302,11 +311,11 @@ fun HomeScreen(
             }
 
             FileAction.BOOKMARK -> {
-                BookmarksManager.addBookmark(context, file.absolutePath)
+                BookmarksManager.addBookmark(context, rename.absolutePathString())
             }
 
             FileAction.UNBOOKMARK -> {
-                BookmarksManager.removeBookmark(context, file.absolutePath)
+                BookmarksManager.removeBookmark(context, rename.absolutePathString())
             }
 
             else -> {
@@ -314,12 +323,12 @@ fun HomeScreen(
                     .show()
             }
         }
-        return resultFile
+        return resultPath
     }
 
     when (val currentDialog = dialogState) {
         is DialogState.Apk -> ApkBottomSheet(
-            file = currentDialog.file,
+            file = currentDialog.path,
             onDismiss = { dialogState = DialogState.None }
         )
 
@@ -329,38 +338,38 @@ fun HomeScreen(
                 sheetState = sheetState,
             ) {
                 FileActionBottomSheet(
-                    file = currentDialog.file,
+                    path = currentDialog.path,
                     onAction = { action ->
                         coroutineScope.launch {
                             when (action) {
                                 FileAction.RENAME -> dialogState =
-                                    DialogState.Rename(currentDialog.file)
+                                    DialogState.Rename(currentDialog.path)
 
                                 FileAction.DETAILS -> dialogState =
-                                    DialogState.Details(currentDialog.file)
+                                    DialogState.Details(currentDialog.path)
 
                                 else -> {
                                     dialogState = DialogState.None
-                                    handleFileAction(context, currentDialog.file, action)
+                                    handleFileAction(context, currentDialog.path, action)
                                 }
                             }
                         }
                     },
                     isBookmarked = BookmarksManager.isBookmarked(
                         context,
-                        currentDialog.file.absolutePath
+                        currentDialog.path.absolutePathString()
                     )
                 )
             }
         }
 
         is DialogState.Details -> DetailsSheet(
-            file = currentDialog.file,
+            file = currentDialog.path,
             onDismiss = { dialogState = DialogState.None }
         )
 
         is DialogState.Extract -> {
-            var extractPath by remember { mutableStateOf(currentDialog.file.nameWithoutExtension()) }
+            var extractPath by remember { mutableStateOf(currentDialog.path.nameWithoutExtension) }
             AlertDialog(
                 onDismissRequest = { dialogState = DialogState.None },
                 title = { Text("Extract") },
@@ -378,9 +387,9 @@ fun HomeScreen(
                 confirmButton = {
                     Button(onClick = {
                         val destination = if (extractPath.isBlank()) {
-                            currentDialog.file.parentFile!!
+                            currentDialog.path.parent
                         } else {
-                            val destinationFile = File(extractPath)
+                            val destinationFile = Path(extractPath)
                             if (destinationFile.isAbsolute) {
                                 destinationFile
                             } else {
@@ -390,7 +399,7 @@ fun HomeScreen(
                         ActionManager.addAction(
                             ExtractAction(
                                 id = System.currentTimeMillis(),
-                                file = currentDialog.file,
+                                path = currentDialog.path,
                                 destination = destination,
                                 onConflict = { conflictInfo ->
                                     suspendCancellableCoroutine { continuation ->
@@ -428,14 +437,14 @@ fun HomeScreen(
         }
 
         is DialogState.Rename -> RenameDialog(
-            file = currentDialog.file,
+            path = currentDialog.path,
             onDismiss = { dialogState = DialogState.None },
             onRename = { newName ->
                 dialogState = DialogState.None
                 ActionManager.addAction(
                     RenameAction(
                         id = System.currentTimeMillis(),
-                        file = currentDialog.file,
+                        path = currentDialog.path,
                         newName = newName
                     )
                 )
@@ -464,42 +473,39 @@ fun HomeScreen(
                     coroutineScope.launch {
                         when (action) {
                             FileAction.CUT -> {
-                                Clipboard.cut(selectedFiles.toList())
+                                Clipboard.cut(selectedPaths.toList())
                                 selectionMode = false
-                                selectedFiles.clear()
+                                selectedPaths.clear()
                             }
 
                             FileAction.COPY -> {
-                                Clipboard.copy(selectedFiles.toList())
+                                Clipboard.copy(selectedPaths.toList())
                                 selectionMode = false
-                                selectedFiles.clear()
+                                selectedPaths.clear()
                             }
 
                             FileAction.DELETE -> {
                                 ActionManager.addAction(
                                     DeleteAction(
                                         id = System.currentTimeMillis(),
-                                        files = selectedFiles.toList()
+                                        files = selectedPaths.toList()
                                     )
                                 )
                                 selectionMode = false
-                                selectedFiles.clear()
+                                selectedPaths.clear()
                             }
 
                             FileAction.COMPRESS -> {
-                                val destination = File(
-                                    tabData.currentPath,
-                                    "archive.zip"
-                                )
+                                val destination = tabData.currentPath.resolve("archive.zip")
                                 ActionManager.addAction(
                                     CompressAction(
                                         id = System.currentTimeMillis(),
-                                        files = selectedFiles.toList(),
+                                        files = selectedPaths.toList(),
                                         destination = destination
                                     )
                                 )
                                 selectionMode = false
-                                selectedFiles.clear()
+                                selectedPaths.clear()
                             }
 
                             else -> {}
@@ -526,9 +532,9 @@ fun HomeScreen(
     BackHandler(enabled = isCurrent) {
         if (selectionMode) {
             selectionMode = false
-            selectedFiles.clear()
-        } else if (tabData.currentPath.parentFile?.canRead() == true && tabData.currentPath.absolutePath != tabData.initialRootDir.absolutePath) {
-            onDirectoryChange(tabData.currentPath.parentFile!!)
+            selectedPaths.clear()
+        } else if (tabData.currentPath.parent.isReadable() == true && tabData.currentPath.absolutePathString() != tabData.initialRootDir.absolutePathString()) {
+            onDirectoryChange(tabData.currentPath.parent)
         } else {
             errorState.value = true
             errorMessage.value = "Cannot read parent directory"
@@ -536,7 +542,7 @@ fun HomeScreen(
     }
 
     LaunchedEffect(tabData.currentPath, tabData.sortOrder) {
-        if (tabData.loadedPath != tabData.currentPath.absolutePath) {
+        if (tabData.loadedPath != tabData.currentPath.absolutePathString()) {
             loadFiles(true)
         } else {
             val sortedFiles = sortFiles(files, tabData.sortOrder)
@@ -570,7 +576,7 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${selectedFiles.size} selected",
+                            text = "${selectedPaths.size} selected",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
@@ -582,7 +588,7 @@ fun HomeScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable {
                                         selectionMode = false
-                                        selectedFiles.clear()
+                                        selectedPaths.clear()
                                     },
                                 color = MaterialTheme.colorScheme.error,
                                 shape = RoundedCornerShape(12.dp)
@@ -646,9 +652,10 @@ fun HomeScreen(
                         }
                         items(
                             items = files,
-                            key = { it.file.absolutePath }
+                            key = { it.absolutePath }
                         ) { fileInfo ->
-                            val isSelected = selectedFiles.contains(fileInfo.file)
+                            val isSelected =
+                                selectedPaths.any { it.absolutePathString() == fileInfo.absolutePath }
 
                             Surface(
                                 modifier = Modifier
@@ -667,11 +674,11 @@ fun HomeScreen(
                                     onFileClick = { clickedFile ->
                                         if (selectionMode) {
                                             if (isSelected) {
-                                                selectedFiles.remove(clickedFile)
+                                                selectedPaths.remove(clickedFile)
                                             } else {
-                                                selectedFiles.add(clickedFile)
+                                                selectedPaths.add(clickedFile)
                                             }
-                                            if (selectedFiles.isEmpty()) {
+                                            if (selectedPaths.isEmpty()) {
                                                 selectionMode = false
                                             }
                                         } else {
@@ -695,7 +702,7 @@ fun HomeScreen(
                                     onFileLongClick = {
                                         if (!selectionMode) {
                                             selectionMode = true
-                                            selectedFiles.add(it)
+                                            selectedPaths.add(it)
                                         }
                                     },
                                     onMoreClick = {

@@ -1,8 +1,8 @@
 package dev.pranav.macaw.ui.file
 
-import java.io.File
+import java.nio.file.Path
 
 sealed class FilePreviewState {
     object None : FilePreviewState()
-    data class Audio(val file: File) : FilePreviewState()
+    data class Audio(val file: Path) : FilePreviewState()
 }

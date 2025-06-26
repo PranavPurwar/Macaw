@@ -20,6 +20,7 @@ import dev.pranav.macaw.model.FileType
 import dev.pranav.macaw.model.IMAGE_FORMATS
 import dev.pranav.macaw.model.VIDEO_FORMATS
 import dev.pranav.macaw.model.getFileType
+import dev.pranav.macaw.util.FileEntry
 import okio.FileSystem
 import okio.buffer
 import okio.source
@@ -27,12 +28,12 @@ import java.io.File
 
 data class AudioFile(val file: File)
 
-class FileMapper : Mapper<File, Any> {
-    override fun map(data: File, options: Options): Any {
+class FileMapper : Mapper<FileEntry, Any> {
+    override fun map(data: FileEntry, options: Options): Any {
         if (data.isDirectory) return R.drawable.twotone_folder_24
 
         if (data.extension in IMAGE_FORMATS || data.extension in VIDEO_FORMATS || data.extension == "apk") {
-            return data
+            return File(data.absolutePath)
         }
 
         return when (data.extension) {
@@ -40,7 +41,7 @@ class FileMapper : Mapper<File, Any> {
             "pdf" -> R.drawable.file_type_pdf
             "json" -> R.drawable.file_type_json
             else -> when (data.getFileType()) {
-                FileType.AUDIO -> AudioFile(data)
+                FileType.AUDIO -> AudioFile(File(data.absolutePath))
                 FileType.ARCHIVE -> Icons.Default.Archive
                 FileType.TEXT -> R.drawable.file_type_text
                 FileType.CODE -> R.drawable.file_type_code

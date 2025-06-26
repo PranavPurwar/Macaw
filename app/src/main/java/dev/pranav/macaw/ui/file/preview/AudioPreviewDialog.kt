@@ -74,7 +74,6 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import dev.pranav.macaw.MainActivity
-import dev.pranav.macaw.util.nameWithoutExtension
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -87,34 +86,43 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.saket.squiggles.SquigglySlider
-import java.io.File
+import java.nio.file.Path
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+import kotlin.io.path.nameWithoutExtension
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AudioPreviewDialog(audioFile: File, onDismiss: () -> Unit) {
+fun AudioPreviewDialog(audioFile: Path, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val playerState by PlaybackService.playerState.collectAsState(initial = PlaybackService.PlayerState())
     val isPlaying = playerState.isPlaying
     val currentPosition = playerState.position
     val duration = playerState.duration
-    val currentFile = playerState.currentFilePath?.let { File(it) } ?: audioFile
+    val currentFile = playerState.currentFilePath?.let { Path(it) } ?: audioFile
 
     var thumbnail by remember { mutableStateOf<Bitmap?>(null) }
     var isLongPressed by remember { mutableStateOf(false) }
 
-    LaunchedEffect(currentFile.absolutePath) {
+    LaunchedEffect(currentFile.absolutePathString()) {
         thumbnail = withContext(Dispatchers.IO) {
-            extractAudioThumbnail(currentFile.absolutePath)
+            extractAudioThumbnail(currentFile.absolutePathString())
         }
     }
 
-    DisposableEffect(audioFile.absolutePath) {
+    DisposableEffect(audioFile.absolutePathString()) {
         val intent = Intent(context, PlaybackService::class.java).apply {
             action = PlaybackService.ACTION_PLAY
-            putExtra(PlaybackService.EXTRA_AUDIO_FILE_PATH, audioFile.absolutePath)
-            putExtra(PlaybackService.EXTRA_AUDIO_TITLE, audioFile.nameWithoutExtension())
+            putExtra(PlaybackService.EXTRA_AUDIO_FILE_PATH, audioFile.absolutePathString())
+            putExtra(PlaybackService.EXTRA_AUDIO_TITLE, audioFile.nameWithoutExtension)
         }
         context.startService(intent)
 
@@ -343,7 +351,7 @@ class PlaybackService : MediaSessionService() {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var progressUpdateJob: Job? = null
 
-    private var playlist: List<File> = emptyList()
+    private var playlist: List<Path> = emptyList()
     private var currentPlaylistIndex = -1
 
     data class PlayerState(
@@ -465,14 +473,15 @@ class PlaybackService : MediaSessionService() {
         when (intent?.action) {
             ACTION_PLAY -> {
                 intent.getStringExtra(EXTRA_AUDIO_FILE_PATH)?.let { path ->
-                    val audioFile = File(path)
+                    val audioFile = Path(path)
                     val title = intent.getStringExtra(EXTRA_AUDIO_TITLE) ?: "Unknown"
 
                     // Build playlist from directory
                     buildPlaylistFromDirectory(audioFile)
 
                     // Find the index of the current file in the playlist
-                    currentPlaylistIndex = playlist.indexOfFirst { it.absolutePath == audioFile.absolutePath }
+                    currentPlaylistIndex =
+                        playlist.indexOfFirst { it.nameWithoutExtension == audioFile.nameWithoutExtension }
 
                     // Play the file
                     player?.apply {
@@ -495,14 +504,22 @@ class PlaybackService : MediaSessionService() {
         return START_STICKY
     }
 
-    private fun buildPlaylistFromDirectory(audioFile: File) {
-        val directory = audioFile.parentFile
+    private fun buildPlaylistFromDirectory(audioFile: Path) {
+        val directory = audioFile.parent
 
-        if (directory != null && directory.exists() && directory.isDirectory) {
-            playlist = directory.listFiles { file ->
-                val extension = file.extension.lowercase(Locale.ROOT)
-                file.isFile && (extension == "mp3" || extension == "wav" || extension == "ogg" || extension == "m4a" || extension == "aac")
-            }?.sortedBy { it.name } ?: emptyList()
+        if (directory != null && directory.exists() && directory.isDirectory()) {
+            playlist = directory.listDirectoryEntries()
+                .filter {
+                    it.isRegularFile() && it.extension in listOf(
+                        "mp3",
+                        "wav",
+                        "ogg",
+                        "m4a",
+                        "aac"
+                    )
+                }
+                .sortedBy { it.nameWithoutExtension }
+                .map { it.toAbsolutePath() }
         } else {
             playlist = listOf(audioFile)
         }
@@ -529,7 +546,7 @@ class PlaybackService : MediaSessionService() {
         currentPlaylistIndex = index
 
         player?.apply {
-            setMediaItem(createMediaItem(file.absolutePath, file.nameWithoutExtension()))
+            setMediaItem(createMediaItem(file.absolutePathString(), file.nameWithoutExtension))
             prepare()
             playWhenReady = true
         }

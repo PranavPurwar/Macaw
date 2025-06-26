@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
 import dev.pranav.macaw.App.Companion.prefs
-import dev.pranav.macaw.util.getLastModifiedDate
+import dev.pranav.macaw.util.getLastModifiedFormattedNative
 import dev.pranav.macaw.util.sizeString
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.SelectionChangeEvent
@@ -69,13 +69,16 @@ import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.component.Magnifier
 import io.github.rosemoe.sora.widget.subscribeAlways
 import me.saket.cascade.CascadeDropdownMenu
-import java.io.File
+import java.nio.file.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.io.path.fileSize
+import kotlin.io.path.name
+import kotlin.io.path.readBytes
 import kotlin.time.ExperimentalTime
 
 @Composable
-fun EditorScreen(file: File, editor: CodeEditor, onSave: () -> Unit) {
+fun EditorScreen(file: Path, editor: CodeEditor, onSave: () -> Unit) {
     Scaffold(
         topBar = {
             Column {
@@ -98,8 +101,8 @@ fun EditorScreen(file: File, editor: CodeEditor, onSave: () -> Unit) {
     ExperimentalTime::class
 )
 @Composable
-fun EditorToolbar(file: File, editor: CodeEditor, onSave: () -> Unit) {
-    var fileSize by remember { mutableStateOf(file.sizeString()) }
+fun EditorToolbar(file: Path, editor: CodeEditor, onSave: () -> Unit) {
+    var fileSize by remember { mutableStateOf(file.fileSize().sizeString()) }
     var showMenu by remember { mutableStateOf(false) }
     var showGoToLineDialog by remember { mutableStateOf(false) }
     val itemPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
@@ -129,10 +132,10 @@ fun EditorToolbar(file: File, editor: CodeEditor, onSave: () -> Unit) {
     }
 
     fileSize = if (savedContentHash != editorContentHash) {
-        file.sizeString() + " | " + LocalDateTime.now()
+        file.fileSize().sizeString() + " | " + LocalDateTime.now()
             .format(DateTimeFormatter.ofPattern("MMM dd, hh:mm a")) + " *"
     } else {
-        file.sizeString() + " | " + file.getLastModifiedDate("MMM dd, hh:mm a")
+        file.fileSize().sizeString() + " | " + file.getLastModifiedFormattedNative()
     }
 
     TopAppBar(

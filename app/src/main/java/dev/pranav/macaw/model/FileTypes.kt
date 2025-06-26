@@ -1,6 +1,9 @@
 package dev.pranav.macaw.model
 
+import dev.pranav.macaw.util.FileEntry
 import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.extension
 
 enum class FileType {
     IMAGE,
@@ -62,6 +65,30 @@ val CODE_FORMATS: Set<String> =
         "s",
         "asm",
     )
+
+fun Path.getFileType(): FileType {
+    return when (extension.lowercase()) {
+        in IMAGE_FORMATS -> FileType.IMAGE
+        in VIDEO_FORMATS -> FileType.VIDEO
+        in AUDIO_FORMATS -> FileType.AUDIO
+        in ARCHIVE_FORMATS -> FileType.ARCHIVE
+        in TEXT_FORMATS -> FileType.TEXT
+        in CODE_FORMATS -> FileType.CODE
+        else -> FileType.UNKNOWN
+    }
+}
+
+fun FileEntry.getFileType(): FileType {
+    return when (extension.lowercase()) {
+        in IMAGE_FORMATS -> FileType.IMAGE
+        in VIDEO_FORMATS -> FileType.VIDEO
+        in AUDIO_FORMATS -> FileType.AUDIO
+        in ARCHIVE_FORMATS -> FileType.ARCHIVE
+        in TEXT_FORMATS -> FileType.TEXT
+        in CODE_FORMATS -> FileType.CODE
+        else -> FileType.UNKNOWN
+    }
+}
 
 fun File.getFileType(): FileType {
     return when (this.extension.lowercase()) {

@@ -36,7 +36,9 @@ import dev.pranav.macaw.ui.theme.FileManagerTheme
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
 import org.eclipse.tm4e.core.registry.IThemeSource
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.Path
+import kotlin.io.path.isDirectory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,7 +58,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun FileManagerApp() {
     val context = LocalContext.current
-    var newPath by remember { mutableStateOf<String?>(null) }
+    var newPath by remember { mutableStateOf<Path?>(null) }
     val colorScheme = MaterialTheme.colorScheme
 
     val bookmarksLauncher = rememberLauncherForActivityResult(
@@ -64,9 +66,9 @@ fun FileManagerApp() {
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.getStringExtra("path")?.let { path ->
-                val file = File(path)
-                if (file.isDirectory) {
-                    newPath = file.absolutePath
+                val file = Path(path)
+                if (file.isDirectory()) {
+                    newPath = file
                 } else {
                     val action = determineFileAction(file)
                     if (action == FileAction.HANDLE_AUDIO || action == FileAction.OPEN_APK_DETAILS) {

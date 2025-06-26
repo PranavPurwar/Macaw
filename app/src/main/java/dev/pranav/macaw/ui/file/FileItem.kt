@@ -1,5 +1,6 @@
 package dev.pranav.macaw.ui.file
 
+import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
@@ -23,21 +24,28 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.pranav.macaw.R
-import dev.pranav.macaw.model.FileInfo
-import java.io.File
+import dev.pranav.macaw.util.FileEntry
+import java.nio.file.Path
+import kotlin.io.path.Path
+import kotlin.io.path.isDirectory
+import kotlin.io.path.name
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileItem(
-    fileInfo: FileInfo,
+    fileInfo: FileEntry,
     isSelected: Boolean,
     selectionMode: Boolean,
-    onFileClick: (File) -> Unit,
-    onFileLongClick: (File) -> Unit,
-    onMoreClick: (File) -> Unit
+    onFileClick: (Path) -> Unit,
+    onFileLongClick: (Path) -> Unit,
+    onMoreClick: (Path) -> Unit
 ) {
-    val file = fileInfo.file
-    val name = remember(file.absolutePath) { file.name }
+    Log.d(
+        "FileItem",
+        "Rendering file item: ${fileInfo.name}, absolute path: ${fileInfo.absolutePath} isSelected: $isSelected, selectionMode: $selectionMode"
+    )
+    val file = remember(fileInfo.absolutePath) { Path(fileInfo.absolutePath) }
+    val name = remember(fileInfo.absolutePath) { file.name }
 
     Row(
         Modifier
@@ -51,9 +59,9 @@ fun FileItem(
     ) {
 
         AsyncImage(
-            model = file,
-            placeholder = painterResource(if (file.isDirectory) R.drawable.twotone_folder_24 else R.mipmap.unk),
-            error = painterResource(if (file.isDirectory) R.drawable.twotone_folder_24 else R.mipmap.unk),
+            model = fileInfo,
+            placeholder = painterResource(if (file.isDirectory()) R.drawable.twotone_folder_24 else R.mipmap.unk),
+            error = painterResource(if (file.isDirectory()) R.drawable.twotone_folder_24 else R.mipmap.unk),
             contentDescription = file.name,
             contentScale = ContentScale.Fit,
             modifier = Modifier.size(36.dp)

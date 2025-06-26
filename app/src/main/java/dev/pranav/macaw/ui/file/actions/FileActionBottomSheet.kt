@@ -41,11 +41,12 @@ import dev.pranav.macaw.model.FileAction
 import dev.pranav.macaw.model.FileType
 import dev.pranav.macaw.model.getFileType
 import dev.pranav.macaw.util.Clipboard
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.isRegularFile
 
 @Composable
 fun FileActionBottomSheet(
-    file: File,
+    path: Path,
     onAction: (FileAction) -> Unit,
     isBookmarked: Boolean
 ) {
@@ -53,14 +54,14 @@ fun FileActionBottomSheet(
         FileAction.CUT to "Cut",
         FileAction.COPY to "Copy",
         FileAction.RENAME to "Rename",
-        if (file.getFileType() == FileType.ARCHIVE) FileAction.EXTRACT to "Extract" else null,
+        if (path.getFileType() == FileType.ARCHIVE) FileAction.EXTRACT to "Extract" else null,
         if (Clipboard.hasFile()) FileAction.PASTE to "Paste" else null,
         FileAction.DELETE to "Delete",
         FileAction.DETAILS to "Details",
-        if (file.isFile) FileAction.OPEN_WITH to "Open with" else null,
-        if (file.isFile) FileAction.SHARE to "Share" else null, // dont share folders
+        if (path.isRegularFile()) FileAction.OPEN_WITH to "Open with" else null,
+        if (path.isRegularFile()) FileAction.SHARE to "Share" else null, // dont share folders
         FileAction.COMPRESS to "Compress",
-        if (file.isFile) FileAction.OPEN_TEXT_EDITOR to "Edit" else null,
+        if (path.isRegularFile()) FileAction.OPEN_TEXT_EDITOR to "Edit" else null,
         FileAction.CLONE to "Clone",
         if (isBookmarked) FileAction.UNBOOKMARK to "Remove" else FileAction.BOOKMARK to "Bookmark",
         if (Clipboard.hasFile()) FileAction.CLEAR_CLIPBOARD to "Clear" else null

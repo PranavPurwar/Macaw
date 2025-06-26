@@ -1,6 +1,5 @@
 package dev.pranav.macaw.ui.file.preview
 
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -26,7 +25,8 @@ import com.rajat.pdfviewer.compose.PdfRendererViewCompose
 import com.rajat.pdfviewer.util.CacheStrategy
 import com.rajat.pdfviewer.util.PdfSource
 import dev.pranav.macaw.ui.theme.FileManagerTheme
-import java.io.File
+import kotlin.io.path.Path
+import kotlin.io.path.name
 
 class PDFPreviewActivity : ComponentActivity() {
 
@@ -35,12 +35,7 @@ class PDFPreviewActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val file = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getSerializableExtra("file", File::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getSerializableExtra("file") as? File
-        }
+        val file = Path(intent.getStringExtra("file") ?: "")
 
         if (file == null) {
             Toast.makeText(this, "Error: File not found", Toast.LENGTH_LONG).show()
@@ -75,7 +70,7 @@ class PDFPreviewActivity : ComponentActivity() {
                     }
                 ) { innerPadding ->
                     PdfRendererViewCompose(
-                        source = PdfSource.LocalFile(file),
+                        source = PdfSource.LocalFile(file.toFile()),
                         lifecycleOwner = LocalLifecycleOwner.current,
                         modifier = Modifier
                             .fillMaxSize()

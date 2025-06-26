@@ -3,8 +3,16 @@ package dev.pranav.macaw.util
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.nio.file.Path
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.fileSize
+import kotlin.io.path.inputStream
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.outputStream
+import kotlin.io.path.walk
 
 private const val DEFAULT_BUFFER_SIZE = 8 * 1024
 
@@ -77,31 +85,31 @@ fun File.compress(
     }
 }
 
-fun List<File>.compress(
-    destination: File, onProgress: (String, Float) -> Unit,
+fun List<Path>.compress(
+    destination: Path, onProgress: (String, Float) -> Unit,
     shouldContinue: () -> Boolean = { true }
 ) {
-    val zipOutputStream = ZipOutputStream(FileOutputStream(destination))
+    val zipOutputStream = ZipOutputStream(destination.outputStream())
     zipOutputStream.use { zos ->
-        val allFiles = mutableListOf<File>()
+        val allFiles = mutableListOf<Path>()
         this.forEach { file ->
-            if (file.isDirectory) {
-                allFiles.addAll(file.walkTopDown())
+            if (file.isDirectory()) {
+                allFiles.addAll(file.walk())
             } else {
                 allFiles.add(file)
             }
         }
-        val distinctFiles = allFiles.distinctBy { it.absolutePath }
+        val distinctFiles = allFiles.distinctBy { it.absolutePathString() }
 
-        val filesToZip = distinctFiles.filter { it.isFile }
-        val totalSize = filesToZip.sumOf { it.length() }
+        val filesToZip = distinctFiles.filter { it.isRegularFile() }
+        val totalSize = filesToZip.sumOf { it.fileSize() }
         var writtenBytes = 0L
 
-        distinctFiles.filter { it.isDirectory }.forEach { dir ->
+        distinctFiles.filter { it.isDirectory() }.forEach { dir ->
             if (!shouldContinue()) return@use
-            val root = this.find { root -> dir.absolutePath.startsWith(root.absolutePath) }
-                ?: dir.parentFile!!
-            val entryName = root.parentFile.toPath().relativize(dir.toPath()).toString()
+            val root = this.find { root -> dir.startsWith(root) }
+                ?: dir.parent
+            val entryName = root.parent.relativize(dir).toString()
             if (entryName.isNotEmpty()) {
                 zos.putNextEntry(ZipEntry("$entryName/"))
                 zos.closeEntry()
@@ -110,9 +118,9 @@ fun List<File>.compress(
 
         filesToZip.forEach { file ->
             if (!shouldContinue()) return@use
-            val root = this.find { root -> file.absolutePath.startsWith(root.absolutePath) }
-                ?: file.parentFile!!
-            val entryName = root.parentFile.toPath().relativize(file.toPath()).toString()
+            val root = this.find { root -> file.startsWith(root) }
+                ?: file.parent
+            val entryName = root.parent.relativize(file).toString()
 
             onProgress(
                 entryName,
@@ -120,7 +128,7 @@ fun List<File>.compress(
             )
 
             zos.putNextEntry(ZipEntry(entryName))
-            FileInputStream(file).use { fis ->
+            file.inputStream().use { fis ->
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 var len: Int
                 while (fis.read(buffer).also { len = it } > 0) {

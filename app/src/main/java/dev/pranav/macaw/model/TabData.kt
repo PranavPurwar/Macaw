@@ -4,15 +4,18 @@ import android.os.Environment
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import dev.pranav.macaw.util.FileEntry
 import dev.pranav.macaw.util.SortOrder
-import java.io.File
+import java.nio.file.Path
 import java.util.UUID
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.name
 
 data class TabData(
-    val initialRootDir: File,
-    var currentPath: File = initialRootDir,
+    val initialRootDir: Path,
+    var currentPath: Path = initialRootDir,
     val id: String = UUID.randomUUID().toString(),
-    val files: SnapshotStateList<FileInfo> = mutableStateListOf(),
+    val files: SnapshotStateList<FileEntry> = mutableStateListOf(),
     var loadedPath: String? = null,
     var isLoading: Boolean = false,
     val lazyListState: LazyListState = LazyListState(),
@@ -20,7 +23,7 @@ data class TabData(
 )
 
 fun TabData.name(): String {
-    return if (currentPath.absolutePath == Environment.getExternalStorageDirectory().absolutePath) {
+    return if (currentPath.absolutePathString() == Environment.getExternalStorageDirectory().absolutePath) {
         "Internal Storage"
     } else {
         currentPath.name.takeIf { it.isNotEmpty() } ?: this.initialRootDir.name

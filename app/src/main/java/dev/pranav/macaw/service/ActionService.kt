@@ -24,7 +24,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import java.io.File
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.deleteRecursively
+import kotlin.io.path.exists
+import kotlin.io.path.moveTo
+import kotlin.io.path.name
 
 class ActionService : Service() {
 
@@ -52,6 +56,7 @@ class ActionService : Service() {
         return START_STICKY
     }
 
+    @OptIn(ExperimentalPathApi::class)
     private suspend fun handleAction(action: Action) {
         if (action.state.value !is ActionState.Pending) return
 
@@ -59,8 +64,8 @@ class ActionService : Service() {
             is ExtractAction -> {
                 try {
                     action.state.value =
-                        ActionState.InProgress(0f, "Extracting ${action.file.name}")
-                    action.file.extract(
+                        ActionState.InProgress(0f, "Extracting ${action.path.name}")
+                    action.path.extract(
                         destinationDir = action.destination,
                         onProgress = { entryName, progress ->
                             action.state.value =
@@ -171,12 +176,16 @@ class ActionService : Service() {
                             return
                         }
                         val destinationFile = action.destination.resolve(file.name)
-                        if (file.renameTo(destinationFile)) {
+                        try {
+                            file.moveTo(destinationFile)
                             action.state.value = ActionState.InProgress(
                                 (index + 1) / totalFiles,
                                 "Moving ${file.name}"
                             )
-                        } else {
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+
+                            // If move fails, fall back to copy and delete
                             file.copyRecursivelyWithConflictResolution(
                                 target = destinationFile,
                                 onProgress = { fileName, progress ->
@@ -216,7 +225,7 @@ class ActionService : Service() {
             is RenameAction -> {
                 try {
                     action.state.value = ActionState.InProgress(0f, "Renaming file...")
-                    val newFile = action.file.resolveSibling(action.newName)
+                    val newFile = action.path.resolveSibling(action.newName)
 
                     if (newFile.exists()) {
                         action.state.value =
@@ -224,10 +233,15 @@ class ActionService : Service() {
                         return
                     }
 
-                    if (action.file.renameTo(newFile)) {
+                    try {
+                        action.path.moveTo(newFile)
                         action.state.value = ActionState.Completed("Rename complete")
-                    } else {
-                        action.file.copyRecursivelyWithConflictResolution(
+                        return
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+
+                        // If move fails, fall back to copy and delete
+                        action.path.copyRecursivelyWithConflictResolution(
                             target = newFile,
                             onProgress = { entryName, progress ->
                                 action.state.value =
@@ -243,7 +257,7 @@ class ActionService : Service() {
                             return
                         }
 
-                        action.file.deleteFile(
+                        action.path.deleteFile(
                             onProgress = { entryName, progress ->
                                 action.state.value = ActionState.InProgress(
                                     0.5f + progress * 0.5f,
@@ -266,13 +280,13 @@ class ActionService : Service() {
 
             is CloneAction -> {
                 try {
-                    action.state.value = ActionState.InProgress(0f, "Cloning ${action.file.name}")
+                    action.state.value = ActionState.InProgress(0f, "Cloning ${action.path.name}")
 
-                    val duplicateName = action.file.duplicateName()
-                    val newFile = File(action.file.parentFile, duplicateName)
+                    val duplicateName = action.path.duplicateName()
+                    val newFile = action.path.resolveSibling(duplicateName)
 
                     // Use the conflict-aware copy function for progress tracking
-                    action.file.copyRecursivelyWithConflictResolution(
+                    action.path.copyRecursivelyWithConflictResolution(
                         target = newFile,
                         onProgress = { fileName, progress ->
                             action.state.value =

@@ -12,18 +12,23 @@ import dev.pranav.macaw.ui.editor.TextEditorActivity
 import dev.pranav.macaw.ui.file.preview.ImagePreviewActivity
 import dev.pranav.macaw.ui.file.preview.PDFPreviewActivity
 import dev.pranav.macaw.ui.file.preview.VideoPreviewActivity
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.extension
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isReadable
+import kotlin.io.path.name
 
 fun handleFileClick(
-    file: File,
+    file: Path,
     context: Context,
-    onDirectoryChange: (File) -> Unit,
-    onShowApkBottomSheet: (File) -> Unit,
-    onShowAudioPreview: (File) -> Unit,
+    onDirectoryChange: (Path) -> Unit,
+    onShowApkBottomSheet: (Path) -> Unit,
+    onShowAudioPreview: (Path) -> Unit,
     onError: (String) -> Unit
 ) {
-    if (file.isDirectory) {
-        if (file.canRead()) {
+    if (file.isDirectory()) {
+        if (file.isReadable()) {
             onDirectoryChange(file)
         } else {
             onError("Cannot read directory ${file.name}")
@@ -37,7 +42,7 @@ fun handleFileClick(
     }
 }
 
-fun determineFileAction(file: File): FileAction {
+fun determineFileAction(file: Path): FileAction {
     return when (file.extension.lowercase()) {
         in AUDIO_FORMATS -> FileAction.HANDLE_AUDIO
 
@@ -52,29 +57,29 @@ fun determineFileAction(file: File): FileAction {
     }
 }
 
-fun executeFileAction(context: Context, file: File, action: FileAction) {
+fun executeFileAction(context: Context, file: Path, action: FileAction) {
     when (action) {
         FileAction.OPEN_TEXT_EDITOR -> {
             val intent = Intent(context, TextEditorActivity::class.java)
-            intent.putExtra("file", file)
+            intent.putExtra("file", file.absolutePathString())
             context.startActivity(intent)
         }
 
         FileAction.OPEN_IMAGE_PREVIEW -> {
             val intent = Intent(context, ImagePreviewActivity::class.java)
-            intent.putExtra("file", file)
+            intent.putExtra("file", file.absolutePathString())
             context.startActivity(intent)
         }
 
         FileAction.OPEN_VIDEO_PREVIEW -> {
             val intent = Intent(context, VideoPreviewActivity::class.java)
-            intent.putExtra("file", file)
+            intent.putExtra("file", file.absolutePathString())
             context.startActivity(intent)
         }
 
         FileAction.OPEN_PDF_PREVIEW -> {
             val intent = Intent(context, PDFPreviewActivity::class.java)
-            intent.putExtra("file", file)
+            intent.putExtra("file", file.absolutePathString())
             context.startActivity(intent)
         }
 
@@ -84,18 +89,19 @@ fun executeFileAction(context: Context, file: File, action: FileAction) {
     }
 }
 
-private fun openWithSystemApp(context: Context, file: File) {
+private fun openWithSystemApp(context: Context, file: Path) {
     try {
         val intent = Intent(Intent.ACTION_VIEW)
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.provider",
-            file
+            file.toFile()
         )
         intent.setDataAndType(uri, null)
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(intent)
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        e.printStackTrace()
         Toast.makeText(context, "No app found to open this file type", Toast.LENGTH_SHORT).show()
     }
 }

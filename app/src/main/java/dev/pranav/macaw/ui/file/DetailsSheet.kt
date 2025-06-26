@@ -30,17 +30,23 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.pranav.macaw.R
 import dev.pranav.macaw.util.getHash
-import dev.pranav.macaw.util.getLastModifiedDate
+import dev.pranav.macaw.util.getLastModifiedFormattedNative
 import dev.pranav.macaw.util.sizeString
 import kotlinx.coroutines.launch
-import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.attribute.PosixFileAttributes
 import java.nio.file.attribute.PosixFilePermissions
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.extension
+import kotlin.io.path.fileSize
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.name
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailsSheet(file: File, onDismiss: () -> Unit) {
+fun DetailsSheet(file: Path, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState()
     var md5 by remember { mutableStateOf<String?>(null) }
     var sha1 by remember { mutableStateOf<String?>(null) }
@@ -49,7 +55,7 @@ fun DetailsSheet(file: File, onDismiss: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(file) {
-        if (file.isFile) {
+        if (file.isRegularFile()) {
             coroutineScope.launch {
                 md5 = file.getHash("MD5")
                 sha1 = file.getHash("SHA-1")
@@ -68,8 +74,8 @@ fun DetailsSheet(file: File, onDismiss: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     AsyncImage(
                         model = file,
-                        placeholder = painterResource(if (file.isDirectory) R.drawable.twotone_folder_24 else R.mipmap.unk),
-                        error = painterResource(if (file.isDirectory) R.drawable.twotone_folder_24 else R.mipmap.unk),
+                        placeholder = painterResource(if (file.isDirectory()) R.drawable.twotone_folder_24 else R.mipmap.unk),
+                        error = painterResource(if (file.isDirectory()) R.drawable.twotone_folder_24 else R.mipmap.unk),
                         contentDescription = file.name,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.size(48.dp)
@@ -77,7 +83,7 @@ fun DetailsSheet(file: File, onDismiss: () -> Unit) {
                     Column(modifier = Modifier.padding(horizontal = 8.dp)) {
                         Text(file.name, style = MaterialTheme.typography.titleSmall)
                         Text(
-                            file.absolutePath,
+                            file.absolutePathString(),
                             modifier = Modifier.padding(top = 8.dp),
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -90,23 +96,24 @@ fun DetailsSheet(file: File, onDismiss: () -> Unit) {
                     modifier = Modifier.padding(top = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (file.isFile) {
+                    if (file.isRegularFile()) {
                         item { DetailItem("Extension", file.extension) }
                     }
-                    item { DetailItem("Last modified", file.getLastModifiedDate()) }
-                    item { DetailItem("Size", file.length().sizeString()) }
+                    item { DetailItem("Last modified", file.getLastModifiedFormattedNative()) }
+                    item { DetailItem("Size", file.fileSize().sizeString()) }
 
                     try {
                         val attrs =
-                            Files.readAttributes(file.toPath(), PosixFileAttributes::class.java)
+                            Files.readAttributes(file, PosixFileAttributes::class.java)
                         val perms = PosixFilePermissions.toString(attrs.permissions())
                         item { DetailItem("Permissions", perms) }
                         item { DetailItem("Owner", attrs.owner().name) }
                     } catch (e: Exception) {
+                        e.printStackTrace()
                         // Ignore
                     }
 
-                    if (file.isFile) {
+                    if (file.isRegularFile()) {
                         if (md5 != null) {
                             item { DetailItem("MD5", md5!!) }
                         }

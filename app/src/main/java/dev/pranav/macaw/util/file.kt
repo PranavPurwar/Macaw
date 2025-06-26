@@ -1,9 +1,24 @@
 package dev.pranav.macaw.util
 
-import dev.pranav.macaw.model.FileInfo
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.fileSize
+import kotlin.io.path.inputStream
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
+import kotlin.io.path.nameWithoutExtension
+import kotlin.io.path.outputStream
+import kotlin.io.path.relativeTo
+import kotlin.io.path.walk
 
 
 fun File.details(): String {
@@ -39,33 +54,37 @@ enum class SortOrder {
     SIZE_DESCENDING,
 }
 
-fun sortFiles(files: List<FileInfo>, sortOrder: SortOrder): List<FileInfo> {
+fun sortFiles(files: List<FileEntry>, sortOrder: SortOrder): List<FileEntry> {
     return files.sortedWith(getFileInfoComparator(sortOrder))
 }
 
-private fun getFileInfoComparator(sortOrder: SortOrder): Comparator<FileInfo> {
-    return compareByDescending<FileInfo> { it.file.isDirectory }.thenComparing { o1, o2 ->
+private fun getFileInfoComparator(sortOrder: SortOrder): Comparator<FileEntry> {
+    return compareByDescending<FileEntry> { it.isDirectory }.thenComparing { o1, o2 ->
         when (sortOrder) {
-            SortOrder.NAME_ASCENDING -> o1.file.name.compareTo(o2.file.name, ignoreCase = true)
-            SortOrder.NAME_DESCENDING -> o2.file.name.compareTo(o1.file.name, ignoreCase = true)
-            SortOrder.DATE_ASCENDING -> o1.file.lastModified().compareTo(o2.file.lastModified())
-            SortOrder.DATE_DESCENDING -> o2.file.lastModified().compareTo(o1.file.lastModified())
-            SortOrder.SIZE_ASCENDING -> o1.file.length().compareTo(o2.file.length())
-            SortOrder.SIZE_DESCENDING -> o2.file.length().compareTo(o1.file.length())
+            SortOrder.NAME_ASCENDING -> o1.name.compareTo(o2.name, ignoreCase = true)
+            SortOrder.NAME_DESCENDING -> o2.name.compareTo(o1.name, ignoreCase = true)
+            SortOrder.DATE_ASCENDING -> o1.lastModified.compareTo(o2.lastModified)
+            SortOrder.DATE_DESCENDING -> o2.lastModified.compareTo(o1.lastModified)
+            SortOrder.SIZE_ASCENDING -> o1.size.compareTo(o2.size)
+            SortOrder.SIZE_DESCENDING -> o2.size.compareTo(o1.size)
         }
     }
 }
 
-fun File.orderedChildren(sortOrder: SortOrder = SortOrder.NAME_ASCENDING): List<File> {
-    val children = listFiles() ?: return emptyList()
-    return children.sortedWith(compareByDescending<File> { it.isDirectory }.thenComparing { o1, o2 ->
+fun Path.orderedChildren(sortOrder: SortOrder = SortOrder.NAME_ASCENDING): List<Path> {
+    val children = listDirectoryEntries()
+    return children.sortedWith(compareByDescending<Path> { it.isDirectory() }.thenComparing { o1, o2 ->
         when (sortOrder) {
             SortOrder.NAME_ASCENDING -> o1.name.compareTo(o2.name, ignoreCase = true)
             SortOrder.NAME_DESCENDING -> o2.name.compareTo(o1.name, ignoreCase = true)
-            SortOrder.DATE_ASCENDING -> o1.lastModified().compareTo(o2.lastModified())
-            SortOrder.DATE_DESCENDING -> o2.lastModified().compareTo(o1.lastModified())
-            SortOrder.SIZE_ASCENDING -> o1.length().compareTo(o2.length())
-            SortOrder.SIZE_DESCENDING -> o2.length().compareTo(o1.length())
+            SortOrder.DATE_ASCENDING -> o1.getLastModifiedFormattedNative()
+                .compareTo(o2.getLastModifiedFormattedNative())
+
+            SortOrder.DATE_DESCENDING -> o2.getLastModifiedFormattedNative()
+                .compareTo(o1.getLastModifiedFormattedNative())
+
+            SortOrder.SIZE_ASCENDING -> o1.fileSize().compareTo(o2.fileSize())
+            SortOrder.SIZE_DESCENDING -> o2.fileSize().compareTo(o1.fileSize())
         }
     })
 }
@@ -105,24 +124,31 @@ fun File.deleteFile(
     }
 }
 
-suspend fun File.copyRecursivelyWithConflictResolution(
-    target: File,
+fun Path.deleteFile(
+    onProgress: ((String, Float) -> Unit)? = null,
+    shouldContinue: () -> Boolean = { true }
+): Boolean {
+    return toFile().deleteFile(onProgress, shouldContinue)
+}
+
+suspend fun Path.copyRecursivelyWithConflictResolution(
+    target: Path,
     onProgress: (fileName: String, progress: Float) -> Unit,
     onConflict: suspend (ConflictInfo) -> ConflictResolution,
     shouldContinue: () -> Boolean = { true }
 ): Boolean {
-    if (!exists() || target.absolutePath == absolutePath) return false // when some idiot tries to copy a file to its own path itself
+    if (!exists() || target.absolutePathString() == absolutePathString()) return false // when some idiot tries to copy a file to its own path itself
 
     var globalConflictResolution: ConflictResolution? = null
 
-    walkTopDown().filter { it.isDirectory }.forEach {
+    walk().filter { it.isDirectory() }.forEach {
         if (!shouldContinue()) return false
         val relativePath = it.relativeTo(this)
-        val destinationFile = File(target, relativePath.path)
+        val destinationFile = target.resolve(relativePath)
 
-        if (destinationFile.exists() && destinationFile.isFile) {
+        if (destinationFile.exists() && destinationFile.isRegularFile()) {
             val resolution = globalConflictResolution ?: onConflict(
-                ConflictInfo(destinationFile, it.name, it.length(), "copy")
+                ConflictInfo(destinationFile, it.name, it.fileSize(), "copy")
             )
 
             when (resolution) {
@@ -138,7 +164,7 @@ suspend fun File.copyRecursivelyWithConflictResolution(
                     if (resolution == ConflictResolution.OVERWRITE_ALL) {
                         globalConflictResolution = ConflictResolution.OVERWRITE_ALL
                     }
-                    destinationFile.delete()
+                    destinationFile.deleteIfExists()
                 }
 
                 ConflictResolution.RENAME -> {
@@ -147,11 +173,11 @@ suspend fun File.copyRecursivelyWithConflictResolution(
             }
         }
 
-        destinationFile.mkdirs()
+        Files.createDirectories(destinationFile)
     }
 
-    val sourceFiles = walkTopDown().filter { it.isFile }.toList()
-    val totalSize = sourceFiles.sumOf { it.length() }
+    val sourceFiles = walk().filter { it.isRegularFile() }.toList()
+    val totalSize = sourceFiles.sumOf { it.fileSize() }
     var copiedSize = 0L
 
     if (totalSize == 0L) {
@@ -162,11 +188,11 @@ suspend fun File.copyRecursivelyWithConflictResolution(
     for (sourceFile in sourceFiles) {
         if (!shouldContinue()) return false
         val relativePath = sourceFile.relativeTo(this)
-        var destinationFile = File(target, relativePath.path)
+        var destinationFile = target.resolve(relativePath)
 
         if (destinationFile.exists()) {
             val resolution = globalConflictResolution ?: onConflict(
-                ConflictInfo(destinationFile, sourceFile.name, sourceFile.length(), "copy")
+                ConflictInfo(destinationFile, sourceFile.name, sourceFile.fileSize(), "copy")
             )
 
             when (resolution) {
@@ -182,13 +208,12 @@ suspend fun File.copyRecursivelyWithConflictResolution(
                     if (resolution == ConflictResolution.OVERWRITE_ALL) {
                         globalConflictResolution = ConflictResolution.OVERWRITE_ALL
                     }
-                    destinationFile.delete()
+                    destinationFile.deleteIfExists()
                 }
 
                 ConflictResolution.RENAME -> {
-                    destinationFile = File(
-                        destinationFile.parent,
-                        destinationFile.duplicateName()
+                    destinationFile = destinationFile.parent.resolve(
+                        sourceFile.duplicateName()
                     )
                 }
             }
@@ -221,6 +246,10 @@ fun File.nameWithoutExtension(): String {
     return if (isDirectory) name else nameWithoutExtension.ifEmpty { this.name }
 }
 
+fun Path.nameWithoutExtension(): String {
+    return if (isDirectory()) name else nameWithoutExtension.ifEmpty { this.name }
+}
+
 fun File.duplicateName(): String {
     val parent = parentFile ?: return nameWithoutExtension()
     var count = 1
@@ -229,6 +258,16 @@ fun File.duplicateName(): String {
         count++
     }
     return "$newName ($count)" + if (isFile && extension.isNotEmpty()) ".${extension}" else ""
+}
+
+fun Path.duplicateName(): String {
+    val parent = parent ?: return nameWithoutExtension()
+    var count = 1
+    val newName = nameWithoutExtension()
+    while (parent.resolve("$newName ($count)").exists()) {
+        count++
+    }
+    return "$newName ($count)" + if (isRegularFile() && extension.isNotEmpty()) ".${extension}" else ""
 }
 
 fun File.clone(): File {
@@ -241,5 +280,50 @@ fun File.clone(): File {
             copyRecursively(newFile, overwrite = true)
         }
         newFile
+    }
+}
+
+fun File.orderedChildrenNative(sortOrder: SortOrder = SortOrder.NAME_ASCENDING): List<FileEntry> {
+    return try {
+        FileJNI.getOrderedChildren(absolutePath, sortOrder.ordinal).toList()
+    } catch (e: Exception) {
+        e.printStackTrace()
+        emptyList()
+    }
+}
+
+fun Path.orderedChildrenNative(sortOrder: SortOrder = SortOrder.NAME_ASCENDING): List<FileEntry> {
+    return try {
+        FileJNI.getOrderedChildren(absolutePathString(), sortOrder.ordinal).toList()
+    } catch (e: Exception) {
+        e.printStackTrace()
+        emptyList()
+    }
+}
+
+fun File.getFileDetailsNative(): String {
+    return try {
+        FileJNI.getFileDetails(absolutePath)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        "Error fetching details"
+    }
+}
+
+fun File.getLastModifiedFormattedNative(format: String = "MMM dd, hh:mm a"): String {
+    return try {
+        FileJNI.getLastModifiedFormatted(absolutePath, format)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        "Error fetching last modified date"
+    }
+}
+
+fun Path.getLastModifiedFormattedNative(format: String = "MMM dd, hh:mm a"): String {
+    return try {
+        FileJNI.getLastModifiedFormatted(absolutePathString(), format)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        "Error fetching last modified date"
     }
 }

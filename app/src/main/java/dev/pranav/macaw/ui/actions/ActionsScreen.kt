@@ -68,6 +68,7 @@ import dev.pranav.macaw.model.ExtractAction
 import dev.pranav.macaw.model.MoveAction
 import dev.pranav.macaw.model.RenameAction
 import dev.pranav.macaw.service.ActionManager
+import kotlin.io.path.name
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

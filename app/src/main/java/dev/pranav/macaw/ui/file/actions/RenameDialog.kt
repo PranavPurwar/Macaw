@@ -10,15 +10,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.name
 
 @Composable
 fun RenameDialog(
-    file: File,
+    path: Path,
     onDismiss: () -> Unit,
     onRename: (String) -> Unit
 ) {
-    var newName by remember { mutableStateOf(file.name) }
+    var newName by remember { mutableStateOf(path.name) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Rename") },

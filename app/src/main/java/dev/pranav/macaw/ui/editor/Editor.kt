@@ -19,7 +19,8 @@ import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.component.Magnifier
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.extension
 
 data class CodeEditorState(
     var editor: CodeEditor? = null,
@@ -61,7 +62,7 @@ fun CodeEditor(
     )
 }
 
-fun CodeEditor.applyEditorSettings(file: File) {
+fun CodeEditor.applyEditorSettings(file: Path) {
     props.apply {
         useICULibToSelectWords = prefs.useICULibToSelectWords
         symbolPairAutoCompletion = prefs.symbolPairAutoCompletion

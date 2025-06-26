@@ -1,6 +1,5 @@
 package dev.pranav.macaw.ui.editor
 
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -22,7 +21,11 @@ import androidx.compose.ui.Modifier
 import dev.pranav.macaw.ui.theme.FileManagerTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
+import kotlin.io.path.Path
+import kotlin.io.path.exists
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 
 class TextEditorActivity : ComponentActivity() {
 
@@ -31,14 +34,9 @@ class TextEditorActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val file = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getSerializableExtra("file", File::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getSerializableExtra("file") as? File
-        }
+        val file = Path(intent.getStringExtra("file_path") ?: "")
 
-        if (file == null || !file.exists()) {
+        if (!file.exists() || !file.isRegularFile()) {
             Toast.makeText(this, "Error: File not found", Toast.LENGTH_LONG).show()
             finish()
             return

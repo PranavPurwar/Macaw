@@ -71,7 +71,7 @@ import dev.pranav.macaw.util.getStorageVolumes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
+import java.nio.file.Path
 
 @OptIn(
     ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class,
@@ -81,10 +81,16 @@ import java.io.File
 fun FileExplorerHomeScreen(
     modifier: Modifier = Modifier,
     onNavigateToBookmarks: () -> Unit,
-    newPathToOpen: String?,
+    newPathToOpen: Path?,
     onNewPathHandled: () -> Unit
 ) {
-    val tabs = remember { mutableStateListOf(TabData(initialRootDir = Environment.getExternalStorageDirectory())) }
+    val tabs = remember {
+        mutableStateListOf(
+            TabData(
+                initialRootDir = Environment.getExternalStorageDirectory().toPath()
+            )
+        )
+    }
     val pagerState = rememberPagerState { tabs.size }
     val coroutineScope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -92,11 +98,11 @@ fun FileExplorerHomeScreen(
 
     LaunchedEffect(newPathToOpen) {
         if (newPathToOpen != null) {
-            val file = File(newPathToOpen)
             if (pagerState.currentPage < tabs.size) {
-                tabs[pagerState.currentPage] = tabs[pagerState.currentPage].copy(currentPath = file)
+                tabs[pagerState.currentPage] =
+                    tabs[pagerState.currentPage].copy(currentPath = newPathToOpen)
             } else {
-                tabs.add(TabData(initialRootDir = file))
+                tabs.add(TabData(initialRootDir = newPathToOpen))
             }
             onNewPathHandled()
         }
@@ -110,7 +116,7 @@ fun FileExplorerHomeScreen(
             ModalDrawerSheet {
                 Spacer(Modifier.height(12.dp))
                 storageVolumesInfo.forEach { volumeInfo ->
-                    val file = volumeInfo.file
+                    val file = volumeInfo.file.toPath()
                     val isActive =
                         pagerState.currentPage < tabs.size && tabs[pagerState.currentPage].currentPath.startsWith(
                             file
@@ -173,7 +179,11 @@ fun FileExplorerHomeScreen(
                     tabs = tabs,
                     activeTabIndex = pagerState.currentPage,
                     onAddTab = {
-                        tabs.add(TabData(initialRootDir = Environment.getExternalStorageDirectory()))
+                        tabs.add(
+                            TabData(
+                                initialRootDir = Environment.getExternalStorageDirectory().toPath()
+                            )
+                        )
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(tabs.size - 1)
                         }
@@ -211,7 +221,11 @@ fun FileExplorerHomeScreen(
                 tabs = tabs,
                 pagerState = pagerState,
                 onAddFirstTab = {
-                    tabs.add(TabData(initialRootDir = Environment.getExternalStorageDirectory()))
+                    tabs.add(
+                        TabData(
+                            initialRootDir = Environment.getExternalStorageDirectory().toPath()
+                        )
+                    )
                 },
                 onDirectoryChange = { pageIndex, newDirectory ->
                     if (pageIndex < tabs.size) {
@@ -245,7 +259,7 @@ private fun FileExplorerAppBar(
     LaunchedEffect(activeTab) {
         if (activeTab != null) {
             pathDetails = withContext(Dispatchers.IO) {
-                activeTab.currentPath.details()
+                activeTab.currentPath.toFile().details()
             }
         }
     }
@@ -387,7 +401,7 @@ private fun FileExplorerContent(
     tabs: List<TabData>,
     pagerState: PagerState,
     onAddFirstTab: () -> Unit,
-    onDirectoryChange: (Int, File) -> Unit,
+    onDirectoryChange: (Int, Path) -> Unit,
 ) {
     if (tabs.isEmpty()) {
         EmptyTabsView(

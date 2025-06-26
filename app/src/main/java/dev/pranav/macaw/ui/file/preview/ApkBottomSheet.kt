@@ -61,18 +61,20 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import dev.pranav.macaw.util.sizeString
 import java.io.ByteArrayInputStream
-import java.io.File
+import java.nio.file.Path
 import java.security.MessageDigest
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.fileSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("unused")
 @Composable
-fun ApkBottomSheet(file: File, onDismiss: () -> Unit) {
+fun ApkBottomSheet(file: Path, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var apkInfo by remember { mutableStateOf<ApkInfo?>(null) }
@@ -225,7 +227,7 @@ fun ApkBottomSheet(file: File, onDismiss: () -> Unit) {
                                                 FileProvider.getUriForFile(
                                                     context,
                                                     "${context.packageName}.provider",
-                                                    file
+                                                    file.toFile()
                                                 ), "application/vnd.android.package-archive"
                                             )
                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -482,7 +484,7 @@ sealed class InstallStatus {
     ) : InstallStatus()
 }
 
-private fun getApkInfo(context: Context, apkFile: File): ApkInfo? {
+private fun getApkInfo(context: Context, apkFile: Path): ApkInfo? {
     val packageManager = context.packageManager
 
     @Suppress("DEPRECATION")
@@ -494,12 +496,12 @@ private fun getApkInfo(context: Context, apkFile: File): ApkInfo? {
 
     @Suppress("DEPRECATION")
     val packageInfo = packageManager.getPackageArchiveInfo(
-        apkFile.absolutePath,
+        apkFile.absolutePathString(),
         flags
     )
 
-    packageInfo?.applicationInfo?.sourceDir = apkFile.absolutePath
-    packageInfo?.applicationInfo?.publicSourceDir = apkFile.absolutePath
+    packageInfo?.applicationInfo?.sourceDir = apkFile.absolutePathString()
+    packageInfo?.applicationInfo?.publicSourceDir = apkFile.absolutePathString()
 
     return packageInfo?.let {
         val appName = it.applicationInfo?.let { appInfo ->
@@ -522,7 +524,7 @@ private fun getApkInfo(context: Context, apkFile: File): ApkInfo? {
             versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode else it.versionCode.toLong(),
             minSdkVersion = it.applicationInfo?.minSdkVersion ?: 0,
             targetSdkVersion = it.applicationInfo?.targetSdkVersion ?: 0,
-            fileSize = apkFile.sizeString(),
+            fileSize = apkFile.fileSize().sizeString(),
             installLocation = formatInstallLocation(it.installLocation),
             icon = icon,
             permissions = it.requestedPermissions?.toList() ?: emptyList(),
