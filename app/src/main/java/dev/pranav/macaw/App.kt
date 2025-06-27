@@ -5,9 +5,10 @@ import android.os.Build
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
-import coil3.request.allowConversionToBitmap
+import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import coil3.video.VideoFrameDecoder
@@ -18,6 +19,7 @@ import dev.pranav.macaw.util.coil.FileMapper
 import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
+import okio.Path.Companion.toOkioPath
 
 class App: Application(), SingletonImageLoader.Factory {
 
@@ -43,7 +45,6 @@ class App: Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         return ImageLoader.Builder(context)
             .crossfade(true)
-            .allowConversionToBitmap(true)
             .components {
                 add(AudioFileFetcherFactory(context))
                 add(FileMapper())
@@ -55,6 +56,17 @@ class App: Application(), SingletonImageLoader.Factory {
                 }
                 add(SvgDecoder.Factory())
                 add(VideoFrameDecoder.Factory())
+            }
+            .memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(this, 0.5)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve("image_cache").toOkioPath())
+                    .maxSizePercent(0.5)
+                    .build()
             }
             .build()
     }

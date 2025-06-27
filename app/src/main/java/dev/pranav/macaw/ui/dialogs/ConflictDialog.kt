@@ -78,7 +78,7 @@ fun ConflictDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = conflictInfo.existingFile.toFile().details(),
+                            text = conflictInfo.existingFile.details(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

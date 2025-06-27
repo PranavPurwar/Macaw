@@ -1,5 +1,6 @@
 package dev.pranav.macaw.ui.actions
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
@@ -13,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.pranav.macaw.model.Action
 import dev.pranav.macaw.service.ActionManager
@@ -36,18 +38,20 @@ private fun ActionProgressDialogInternal(
         onDismissRequest = onHide,
         title = { Text(text = action::class.java.simpleName.replace("Action", "")) },
         text = {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (val s = state) {
                     is ActionState.InProgress -> {
-                        Text(
-                            text = s.message,
-                            style = MaterialTheme.typography.bodySmall
-                        )
 
                         LinearProgressIndicator(
                             progress = { s.progress },
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        Text(
+                            text = s.message,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
                     }
 
                     is ActionState.Pending -> {

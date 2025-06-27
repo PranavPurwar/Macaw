@@ -14,9 +14,9 @@ import dev.pranav.macaw.model.MoveAction
 import dev.pranav.macaw.model.RenameAction
 import dev.pranav.macaw.ui.actions.ActionState
 import dev.pranav.macaw.util.compress
-import dev.pranav.macaw.util.copyRecursivelyWithConflictResolution
+import dev.pranav.macaw.util.copyRecursively
 import dev.pranav.macaw.util.deleteFile
-import dev.pranav.macaw.util.duplicateName
+import dev.pranav.macaw.util.duplicate
 import dev.pranav.macaw.util.extract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -144,7 +144,7 @@ class ActionService : Service() {
                             return
                         }
                         val destinationFile = action.destination.resolve(file.name)
-                        file.copyRecursivelyWithConflictResolution(
+                        file.copyRecursively(
                             target = destinationFile,
                             onProgress = { fileName, progress ->
                                 action.state.value = ActionState.InProgress(
@@ -186,7 +186,7 @@ class ActionService : Service() {
                             e.printStackTrace()
 
                             // If move fails, fall back to copy and delete
-                            file.copyRecursivelyWithConflictResolution(
+                            file.copyRecursively(
                                 target = destinationFile,
                                 onProgress = { fileName, progress ->
                                     action.state.value = ActionState.InProgress(
@@ -241,7 +241,7 @@ class ActionService : Service() {
                         e.printStackTrace()
 
                         // If move fails, fall back to copy and delete
-                        action.path.copyRecursivelyWithConflictResolution(
+                        action.path.copyRecursively(
                             target = newFile,
                             onProgress = { entryName, progress ->
                                 action.state.value =
@@ -282,17 +282,11 @@ class ActionService : Service() {
                 try {
                     action.state.value = ActionState.InProgress(0f, "Cloning ${action.path.name}")
 
-                    val duplicateName = action.path.duplicateName()
-                    val newFile = action.path.resolveSibling(duplicateName)
-
-                    // Use the conflict-aware copy function for progress tracking
-                    action.path.copyRecursivelyWithConflictResolution(
-                        target = newFile,
+                    val duplicated = action.path.duplicate(
                         onProgress = { fileName, progress ->
                             action.state.value =
-                                ActionState.InProgress(progress, "Cloning $fileName")
+                                ActionState.InProgress(progress, "Cloning $")
                         },
-                        onConflict = action.onConflict,
                         shouldContinue = { !action.isCancelled.get() }
                     )
 
@@ -300,7 +294,7 @@ class ActionService : Service() {
                         action.state.value = ActionState.Failed("Cancelled")
                     } else {
                         action.state.value =
-                            ActionState.Completed("Clone complete: ${newFile.name}")
+                            ActionState.Completed("Clone complete: ${duplicated.name}")
                     }
                 } catch (e: Exception) {
                     action.state.value = ActionState.Failed(e.message ?: "Unknown error")

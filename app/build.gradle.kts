@@ -17,11 +17,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        ndk {
-            ndkVersion = "29.0.13599879"
-
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-        }
     }
 
     buildTypes {
@@ -50,13 +45,6 @@ android {
 
     buildFeatures {
         compose = true
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "4.0.2"
-        }
     }
 }
 

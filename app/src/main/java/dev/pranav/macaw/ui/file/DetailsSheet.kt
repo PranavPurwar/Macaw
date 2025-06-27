@@ -29,9 +29,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.pranav.macaw.R
-import dev.pranav.macaw.util.getHash
-import dev.pranav.macaw.util.getLastModifiedFormattedNative
+import dev.pranav.macaw.util.getHashes
+import dev.pranav.macaw.util.getLastModified
 import dev.pranav.macaw.util.sizeString
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.nio.file.Files
 import java.nio.file.Path
@@ -48,25 +49,33 @@ import kotlin.io.path.name
 @Composable
 fun DetailsSheet(file: Path, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState()
-    var md5 by remember { mutableStateOf<String?>(null) }
-    var sha1 by remember { mutableStateOf<String?>(null) }
-    var sha256 by remember { mutableStateOf<String?>(null) }
-    var sha512 by remember { mutableStateOf<String?>(null) }
+    var crc32 by remember { mutableStateOf<String?>("Calculating...") }
+    var md5 by remember { mutableStateOf<String?>("Calculating...") }
+    var sha1 by remember { mutableStateOf<String?>("Calculating...") }
+    var sha256 by remember { mutableStateOf<String?>("Calculating...") }
+    var sha512 by remember { mutableStateOf<String?>("Calculating...") }
     val coroutineScope = rememberCoroutineScope()
+    var hashJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(file) {
+        hashJob?.cancel()
         if (file.isRegularFile()) {
-            coroutineScope.launch {
-                md5 = file.getHash("MD5")
-                sha1 = file.getHash("SHA-1")
-                sha256 = file.getHash("SHA-256")
-                sha512 = file.getHash("SHA-512")
+            hashJob = coroutineScope.launch {
+                val hashes = file.getHashes()
+                md5 = hashes.md5
+                sha1 = hashes.sha1
+                sha256 = hashes.sha256
+                sha512 = hashes.sha512
+                crc32 = hashes.crc32
             }
         }
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            hashJob?.cancel()
+            onDismiss()
+        },
         sheetState = sheetState,
     ) {
         SelectionContainer {
@@ -99,7 +108,7 @@ fun DetailsSheet(file: Path, onDismiss: () -> Unit) {
                     if (file.isRegularFile()) {
                         item { DetailItem("Extension", file.extension) }
                     }
-                    item { DetailItem("Last modified", file.getLastModifiedFormattedNative()) }
+                    item { DetailItem("Last modified", file.getLastModified()) }
                     item { DetailItem("Size", file.fileSize().sizeString()) }
 
                     try {
@@ -114,18 +123,11 @@ fun DetailsSheet(file: Path, onDismiss: () -> Unit) {
                     }
 
                     if (file.isRegularFile()) {
-                        if (md5 != null) {
-                            item { DetailItem("MD5", md5!!) }
-                        }
-                        if (sha1 != null) {
-                            item { DetailItem("SHA-1", sha1!!) }
-                        }
-                        if (sha256 != null) {
-                            item { DetailItem("SHA-256", sha256!!) }
-                        }
-                        if (sha512 != null) {
-                            item { DetailItem("SHA-512", sha512!!) }
-                        }
+                        item { VerticalDetailItem("CRC-32", crc32!!) }
+                        item { VerticalDetailItem("MD5", md5!!) }
+                        item { VerticalDetailItem("SHA-1", sha1!!) }
+                        item { VerticalDetailItem("SHA-256", sha256!!) }
+                        item { VerticalDetailItem("SHA-512", sha512!!) }
                     }
                 }
             }
@@ -144,3 +146,13 @@ private fun DetailItem(name: String, value: String) {
     }
 }
 
+@Composable
+private fun VerticalDetailItem(name: String, value: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(name, fontWeight = FontWeight.Bold)
+        Text(value, style = MaterialTheme.typography.bodySmall)
+    }
+}

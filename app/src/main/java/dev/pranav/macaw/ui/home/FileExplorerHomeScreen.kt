@@ -259,7 +259,7 @@ private fun FileExplorerAppBar(
     LaunchedEffect(activeTab) {
         if (activeTab != null) {
             pathDetails = withContext(Dispatchers.IO) {
-                activeTab.currentPath.toFile().details()
+                activeTab.currentPath.details()
             }
         }
     }

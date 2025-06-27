@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
 import dev.pranav.macaw.App.Companion.prefs
-import dev.pranav.macaw.util.getLastModifiedFormattedNative
+import dev.pranav.macaw.util.getLastModified
 import dev.pranav.macaw.util.sizeString
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.SelectionChangeEvent
@@ -135,7 +135,7 @@ fun EditorToolbar(file: Path, editor: CodeEditor, onSave: () -> Unit) {
         file.fileSize().sizeString() + " | " + LocalDateTime.now()
             .format(DateTimeFormatter.ofPattern("MMM dd, hh:mm a")) + " *"
     } else {
-        file.fileSize().sizeString() + " | " + file.getLastModifiedFormattedNative()
+        file.fileSize().sizeString() + " | " + file.getLastModified()
     }
 
     TopAppBar(

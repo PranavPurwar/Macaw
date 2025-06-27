@@ -1,7 +1,6 @@
 package dev.pranav.macaw.ui.file
 
-import android.util.Log
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,50 +18,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
-import dev.pranav.macaw.R
-import dev.pranav.macaw.util.FileEntry
+import coil3.compose.rememberAsyncImagePainter
+import dev.pranav.macaw.util.details
 import java.nio.file.Path
-import kotlin.io.path.Path
-import kotlin.io.path.isDirectory
 import kotlin.io.path.name
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileItem(
-    fileInfo: FileEntry,
+    path: Path,
     isSelected: Boolean,
     selectionMode: Boolean,
     onFileClick: (Path) -> Unit,
     onFileLongClick: (Path) -> Unit,
     onMoreClick: (Path) -> Unit
 ) {
-    Log.d(
-        "FileItem",
-        "Rendering file item: ${fileInfo.name}, absolute path: ${fileInfo.absolutePath} isSelected: $isSelected, selectionMode: $selectionMode"
-    )
-    val file = remember(fileInfo.absolutePath) { Path(fileInfo.absolutePath) }
-    val name = remember(fileInfo.absolutePath) { file.name }
+    val name = remember(path.name) { path.name.ifEmpty { "Unknown" } }
+    val details = remember(path.name) { path.details() }
 
+    val painter = rememberAsyncImagePainter(
+        path,
+        filterQuality = FilterQuality.Low
+    )
     Row(
         Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { onFileClick(file) },
-                onLongClick = { onFileLongClick(file) }
+                onClick = { onFileClick(path) },
+                onLongClick = { onFileLongClick(path) }
             )
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
 
-        AsyncImage(
-            model = fileInfo,
-            placeholder = painterResource(if (file.isDirectory()) R.drawable.twotone_folder_24 else R.mipmap.unk),
-            error = painterResource(if (file.isDirectory()) R.drawable.twotone_folder_24 else R.mipmap.unk),
-            contentDescription = file.name,
+        Image(
+            painter = painter,
+            contentDescription = path.name,
             contentScale = ContentScale.Fit,
             modifier = Modifier.size(36.dp)
         )
@@ -79,7 +72,7 @@ fun FileItem(
             )
 
             Text(
-                fileInfo.details,
+                details,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -87,10 +80,10 @@ fun FileItem(
         if (selectionMode) {
             Checkbox(
                 checked = isSelected,
-                onCheckedChange = { onFileClick(file) }
+                onCheckedChange = { onFileClick(path) }
             )
         } else {
-            IconButton(onClick = { onMoreClick(file) }) {
+            IconButton(onClick = { onMoreClick(path) }) {
                 Icon(Icons.TwoTone.MoreVert, contentDescription = "More options")
             }
         }

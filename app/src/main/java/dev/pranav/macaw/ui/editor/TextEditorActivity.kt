@@ -34,7 +34,7 @@ class TextEditorActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val file = Path(intent.getStringExtra("file_path") ?: "")
+        val file = Path(intent.getStringExtra("file") ?: "")
 
         if (!file.exists() || !file.isRegularFile()) {
             Toast.makeText(this, "Error: File not found", Toast.LENGTH_LONG).show()

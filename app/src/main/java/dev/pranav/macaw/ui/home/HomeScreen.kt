@@ -83,7 +83,7 @@ import dev.pranav.macaw.util.BookmarksManager
 import dev.pranav.macaw.util.Clipboard
 import dev.pranav.macaw.util.ConflictInfo
 import dev.pranav.macaw.util.ConflictResolution
-import dev.pranav.macaw.util.orderedChildrenNative
+import dev.pranav.macaw.util.orderedChildren
 import dev.pranav.macaw.util.sortFiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,6 +95,7 @@ import kotlin.coroutines.resume
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.isReadable
+import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
 
 private sealed class DialogState {
@@ -125,6 +126,7 @@ fun HomeScreen(
     val errorMessage = remember { mutableStateOf("") }
     val context = LocalContext.current
     var loading by remember { mutableStateOf(tabData.isLoading) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var filePreviewState by remember { mutableStateOf<FilePreviewState>(FilePreviewState.None) }
     val coroutineScope = rememberCoroutineScope()
 
@@ -142,7 +144,7 @@ fun HomeScreen(
         }
         try {
             val children = withContext(Dispatchers.IO) {
-                tabData.currentPath.orderedChildrenNative(tabData.sortOrder)
+                tabData.currentPath.orderedChildren(tabData.sortOrder)
             }
             withContext(Dispatchers.Main) {
                 files.clear()
@@ -159,6 +161,25 @@ fun HomeScreen(
                 if (!firstLoad) loading = false
                 tabData.isLoading = false
             }
+        }
+    }
+
+    suspend fun refreshFiles() {
+        isRefreshing = true
+        try {
+            val children = withContext(Dispatchers.IO) {
+                tabData.currentPath.orderedChildren(tabData.sortOrder)
+            }
+            withContext(Dispatchers.Main) {
+                files.clear()
+                files.addAll(children)
+                tabData.loadedPath = tabData.currentPath.absolutePathString()
+            }
+        } catch (e: Exception) {
+            errorState.value = true
+            errorMessage.value = "Error refreshing files: ${e.message}"
+        } finally {
+            isRefreshing = false
         }
     }
 
@@ -620,10 +641,10 @@ fun HomeScreen(
             }
 
             PullToRefreshBox(
-                isRefreshing = loading,
+                isRefreshing = isRefreshing,
                 onRefresh = {
                     coroutineScope.launch {
-                        loadFiles()
+                        refreshFiles()
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -652,10 +673,11 @@ fun HomeScreen(
                         }
                         items(
                             items = files,
-                            key = { it.absolutePath }
+                            key = { it.name }
                         ) { fileInfo ->
-                            val isSelected =
-                                selectedPaths.any { it.absolutePathString() == fileInfo.absolutePath }
+                            val isSelected = remember(selectedPaths) {
+                                selectedPaths.any { it.absolutePathString() == fileInfo.absolutePathString() }
+                            }
 
                             Surface(
                                 modifier = Modifier
@@ -668,7 +690,7 @@ fun HomeScreen(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 FileItem(
-                                    fileInfo = fileInfo,
+                                    path = fileInfo,
                                     isSelected = isSelected,
                                     selectionMode = selectionMode,
                                     onFileClick = { clickedFile ->
